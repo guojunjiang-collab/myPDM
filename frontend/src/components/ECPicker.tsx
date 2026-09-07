@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Modal } from './Modal';
+import { Modal, MODAL_Z } from './Modal';
+import Button from './ui/Button';
+import Input from './ui/Input';
 import { useAuthStore } from '../stores/auth';
 
 interface ECPickerProps {
@@ -57,12 +59,12 @@ export default function ECPicker({ open, onClose, onConfirm }: ECPickerProps) {
   };
 
   return (
-    <Modal open={open} title="选择 EC(变更单)" onClose={onClose} width="lg" zIndex={60}>
-      <input
+    <Modal open={open} title="选择 EC(变更单)" onClose={onClose} width="lg" zIndex={MODAL_Z.picker}>
+      <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="搜索单号/标题"
-        className="w-full mb-3 px-3 py-2 border border-gray-300 rounded-lg"
+        className="mb-3"
       />
       <div className="max-h-80 overflow-y-auto divide-y">
         {filtered.map((r) => (
@@ -70,16 +72,16 @@ export default function ECPicker({ open, onClose, onConfirm }: ECPickerProps) {
             <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
             <span className="text-xs px-2 py-0.5 rounded bg-primary-50 text-primary-700">{r.kind}</span>
             <span className="font-medium">{r.number}</span>
-            <span className="text-gray-500 truncate">{r.title}</span>
+            <span className="text-[var(--ui-text-secondary)] truncate">{r.title}</span>
           </label>
         ))}
-        {filtered.length === 0 && <div className="py-8 text-center text-gray-400">无数据</div>}
+        {filtered.length === 0 && <div className="py-8 text-center text-[var(--ui-text-tertiary)]">无数据</div>}
       </div>
       <div className="flex justify-end gap-2 mt-4">
-        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-        <button onClick={handleConfirm} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+        <Button variant="secondary" onClick={onClose}>取消</Button>
+        <Button onClick={handleConfirm}>
           确认({selected.size})
-        </button>
+        </Button>
       </div>
     </Modal>
   );

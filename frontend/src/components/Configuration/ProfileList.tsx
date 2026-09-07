@@ -6,6 +6,11 @@ import { ConfirmModal } from '../Modal';
 import ProfileEditModal from './ProfileEditModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileCompareModal from './ProfileCompareModal';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 
 export default function ProfileList() {
   const [items, setItems] = useState<ConfigurationProfile[]>([]);
@@ -56,11 +61,14 @@ export default function ProfileList() {
     });
   }, [items, search, searchField, statusFilter]);
 
+  // 客户端排序（全量数据）
+  const { sortedData: sortedProfiles, sortField, sortDirection, handleSort } = useTableSort<ConfigurationProfile>(filteredData);
+
   // 分页
   const PAGE_SIZE = 20;
-  const total = filteredData.length;
+  const total = sortedProfiles.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const pagedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pagedData = sortedProfiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // 搜索变化时重置页码
   useEffect(() => { setPage(1); }, [search, searchField, statusFilter]);
@@ -70,11 +78,17 @@ export default function ProfileList() {
     try { await configurationProfileApi.delete(deleteId); setDeleteId(null); load(); } catch {}
   };
 
-  const handleSubmit = async (profile: ConfigurationProfile) => {
-    if ((profile.reviewer_count ?? profile.reviewers?.length ?? 0) === 0) {
-      if (!confirm('当前无审批人，提交后将直接生效。确认提交？')) return;
-    }
+  // 无审批人提交确认（状态驱动 ConfirmModal）
+  const [submitConfirm, setSubmitConfirm] = useState<ConfigurationProfile | null>(null);
+  const doSubmit = async (profile: ConfigurationProfile) => {
     try { await configurationProfileApi.submit(profile.id); load(); } catch {}
+  };
+  const handleSubmit = (profile: ConfigurationProfile) => {
+    if ((profile.reviewer_count ?? profile.reviewers?.length ?? 0) === 0) {
+      setSubmitConfirm(profile);
+      return;
+    }
+    doSubmit(profile);
   };
   const handleWithdraw = async (id: string) => {
     try { await configurationProfileApi.withdraw(id); load(); } catch {}
@@ -82,10 +96,9 @@ export default function ProfileList() {
   const handleReopen = async (id: string) => {
     try { await configurationProfileApi.reopen(id); load(); } catch {}
   };
-  const handleArchive = async (id: string) => {
-    if (!confirm('确认归档该配置？')) return;
-    try { await configurationProfileApi.archive(id); load(); } catch {}
-  };
+  // 归档确认（状态驱动 ConfirmModal）
+  const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
+  const handleArchive = (id: string) => setArchiveConfirmId(id);
 
   const handleCcOpen = async (id: string) => {
     setCcTargetId(id);
@@ -114,27 +127,27 @@ export default function ProfileList() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 搜索 + 新建 */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <select
+        <Input
+          type="text"
+          placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-0"
+        />
+        <Select
+          className="!w-auto"
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="all">全部字段</option>
           <option value="code">编号</option>
           <option value="name">名称</option>
           <option value="remark">备注</option>
-        </select>
-        <input
-          type="text"
-          placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-        <select
+        </Select>
+        <Select
+          className="!w-auto"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
           <option value="draft">草稿</option>
@@ -142,41 +155,38 @@ export default function ProfileList() {
           <option value="active">生效中</option>
           <option value="rejected">已驳回</option>
           <option value="archived">已归档</option>
-        </select>
-        <button
-          onClick={() => setCompareOpen(true)}
-          className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 text-sm"
-        >
+        </Select>
+        <Button onClick={() => setCompareOpen(true)}>
           ⇄ 配置对比
-        </button>
+        </Button>
         <div className="flex-1" />
         {canEdit() && (
-          <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建配置</button>
+          <Button onClick={() => setCreateOpen(true)}>+ 新建配置</Button>
         )}
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">架次</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500 w-0 whitespace-nowrap">操作</th>
+              <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">编号</SortableTh>
+              <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">状态</SortableTh>
+              <SortableTh className="text-left">架次</SortableTh>
+              <SortableTh sortKey="created_at" active={sortField === 'created_at'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">创建时间</SortableTh>
+              <SortableTh align="right" className="w-0 whitespace-nowrap">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : pagedData.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
             ) : pagedData.map((profile) => (
-              <tr key={profile.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(profile.id)}>
+              <tr key={profile.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetailId(profile.id)}>
                 <td className="px-4 py-3 text-sm font-medium">{profile.code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{profile.name}</td>
                 <td className="px-4 py-3 text-sm font-medium"><ProfileStatusBadge status={profile.status} /></td>
@@ -186,40 +196,40 @@ export default function ProfileList() {
                   {profile.status === 'draft' && (
                     <>
                       {canEdit() && (
-                        <button onClick={() => setEditId(profile.id)} className="text-primary-600 hover:text-primary-800">编辑</button>
+                        <Button variant="link" size="xs" onClick={() => setEditId(profile.id)}>编辑</Button>
                       )}
-                      <button onClick={() => handleSubmit(profile)} className="text-green-600 hover:text-green-800">提交评审</button>
+                      <Button variant="link" size="xs" onClick={() => handleSubmit(profile)}>提交评审</Button>
                     </>
                   )}
                   {profile.status === 'reviewing' && (
                     <>
-                      <button onClick={() => setDetailId(profile.id)} className="text-primary-600 hover:text-primary-800">审批</button>
-                      <button onClick={() => handleWithdraw(profile.id)} className="text-orange-600 hover:text-orange-800">撤回</button>
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
+                      <Button variant="link" size="xs" onClick={() => setDetailId(profile.id)}>审批</Button>
+                      <Button variant="link" size="xs" onClick={() => handleWithdraw(profile.id)}>撤回</Button>
+                      <Button variant="link" size="xs" onClick={() => handleCcOpen(profile.id)}>知会</Button>
                     </>
                   )}
                   {profile.status === 'active' && (
                     <>
                       {isAdmin() && (
-                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
+                        <Button variant="link" size="xs" onClick={() => handleArchive(profile.id)}>归档</Button>
                       )}
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
+                      <Button variant="link" size="xs" onClick={() => handleCcOpen(profile.id)}>知会</Button>
                     </>
                   )}
                   {profile.status === 'rejected' && (
                     <>
-                      <button onClick={() => handleReopen(profile.id)} className="text-primary-600 hover:text-primary-800">重新编辑</button>
+                      <Button variant="link" size="xs" onClick={() => handleReopen(profile.id)}>重新编辑</Button>
                       {isAdmin() && (
-                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
+                        <Button variant="link" size="xs" onClick={() => handleArchive(profile.id)}>归档</Button>
                       )}
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
+                      <Button variant="link" size="xs" onClick={() => handleCcOpen(profile.id)}>知会</Button>
                     </>
                   )}
                   {profile.status === 'archived' && (
-                    <button onClick={() => setDetailId(profile.id)} className="text-gray-600 hover:text-gray-800">查看</button>
+                    <Button variant="link" size="xs" onClick={() => setDetailId(profile.id)}>查看</Button>
                   )}
                   {isAdmin() && (
-                    <button onClick={() => setDeleteId(profile.id)} className="text-red-600 hover:text-red-800">删除</button>
+                    <Button variant="danger" size="xs" onClick={() => setDeleteId(profile.id)}>删除</Button>
                   )}
                 </td>
               </tr>
@@ -232,17 +242,17 @@ export default function ProfileList() {
       {ccTargetId && (
         <div className="flex items-center gap-2 mt-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
           <span className="text-sm text-blue-700">选择知会人：</span>
-          <select
+          <Select
             onChange={(e) => { if (e.target.value) handleCcAdd(e.target.value); }}
-            className="border border-blue-300 rounded px-2 py-1 text-sm bg-white"
+            size="xs"
             autoFocus
           >
             <option value="">请选择</option>
             {ccUsers.map((u) => (
               <option key={u.id} value={u.id}>{u.real_name}</option>
             ))}
-          </select>
-          <button onClick={() => setCcTargetId(null)} className="text-gray-400 hover:text-gray-600 text-sm">取消</button>
+          </Select>
+          <Button variant="link" size="xs" onClick={() => setCcTargetId(null)}>取消</Button>
         </div>
       )}
 
@@ -250,9 +260,9 @@ export default function ProfileList() {
       {totalPages > 1 && (
         <div className="flex justify-center gap-1 mt-4">
           {Array.from({ length: totalPages }, (_, i) => (
-            <button key={i} onClick={() => setPage(i + 1)}
-              className={`px-3 py-1 text-xs rounded ${page === i + 1 ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >{i + 1}</button>
+            <Button key={i} onClick={() => setPage(i + 1)}
+              variant={page === i + 1 ? 'primary' : 'ghost'} size="xs"
+            >{i + 1}</Button>
           ))}
         </div>
       )}
@@ -289,6 +299,32 @@ export default function ProfileList() {
         content="确定要删除该构型配置吗？配置清单将一并删除。"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      {/* 无审批人提交确认 */}
+      <ConfirmModal
+        open={!!submitConfirm}
+        title="确认提交"
+        content="当前无审批人，提交后将直接生效。确认提交？"
+        confirmText="确认提交"
+        type="warning"
+        onConfirm={() => { if (submitConfirm) doSubmit(submitConfirm); setSubmitConfirm(null); }}
+        onCancel={() => setSubmitConfirm(null)}
+      />
+
+      {/* 归档确认 */}
+      <ConfirmModal
+        open={!!archiveConfirmId}
+        title="确认归档"
+        content="确认归档该配置？"
+        confirmText="归档"
+        type="danger"
+        onConfirm={async () => {
+          if (!archiveConfirmId) return;
+          try { await configurationProfileApi.archive(archiveConfirmId); load(); } catch {}
+          setArchiveConfirmId(null);
+        }}
+        onCancel={() => setArchiveConfirmId(null)}
       />
 
       <ProfileCompareModal open={compareOpen} onClose={() => setCompareOpen(false)} />

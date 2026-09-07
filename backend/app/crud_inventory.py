@@ -402,7 +402,35 @@ def list_documents(db: Session, params: DocumentListParams, current_user: User):
     if params.search:
         q = q.filter(InventoryDocument.doc_number.ilike(f"%{params.search}%"))
     total = q.count()
-    docs = q.order_by(InventoryDocument.created_at.desc()).offset(
+    # 服务端排序（白名单映射，防注入）
+    from app.models import User as UserModel
+    from sqlalchemy.orm import aliased
+    SORT_FIELDS = {
+        'doc_number': InventoryDocument.doc_number,
+        'doc_type': InventoryDocument.doc_type,
+        'status': InventoryDocument.status,
+        'creator_name': None,  # 占位，实际 join users 表
+        'keeper_name': None,   # 占位，实际 join users 表
+        'created_at': InventoryDocument.created_at,
+    }
+    sort_field = params.sort_field or 'created_at'
+    sort_order = params.sort_order or 'desc'
+    if sort_field not in SORT_FIELDS:
+        raise HTTPException(status_code=400, detail=f"Invalid sort_field: {sort_field}")
+    if sort_order not in ('asc', 'desc'):
+        raise HTTPException(status_code=400, detail=f"Invalid sort_order: {sort_order}")
+    if sort_field == 'creator_name':
+        user_alias = aliased(UserModel)
+        q = q.outerjoin(user_alias, user_alias.id == InventoryDocument.creator_id)
+        col = user_alias.real_name
+    elif sort_field == 'keeper_name':
+        user_alias = aliased(UserModel)
+        q = q.outerjoin(user_alias, user_alias.id == InventoryDocument.keeper_id)
+        col = user_alias.real_name
+    else:
+        col = SORT_FIELDS[sort_field]
+    order = col.asc().nullslast() if sort_order == 'asc' else col.desc().nullslast()
+    docs = q.order_by(order).offset(
         (params.page - 1) * params.page_size
     ).limit(params.page_size).all()
     return docs, total

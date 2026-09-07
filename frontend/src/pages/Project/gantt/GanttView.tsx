@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { projectApi } from '../../../services/projectApi';
+import { toast } from '../../../components/Toast';
 import type { GanttData, GanttTask } from '../../../types/project';
 import type { Scale } from './ganttUtils';
 import {
@@ -24,9 +25,11 @@ interface Props {
   onHoverChange?: (taskId: string | null) => void;
   hoveredId?: string | null;
   filteredTaskIds?: Set<string> | null;
+  /** hideLeftPanel 模式下外部提供的滚动容器 ref（项目详情右面板），用于宽度测量与拖拽平移 */
+  scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
-export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey, project, expanded: extExpanded, onExpandedChange, scale: extScale, onScaleChange, autoScheduleKey, hideLeftPanel, onHoverChange, hoveredId: extHoveredId, filteredTaskIds }: Props) {
+export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey, project, expanded: extExpanded, onExpandedChange, scale: extScale, onScaleChange, autoScheduleKey, hideLeftPanel, onHoverChange, hoveredId: extHoveredId, filteredTaskIds, scrollRef }: Props) {
   const [data, setData] = useState<GanttData | null>(null);
   const [intScale, setIntScale] = useState<Scale>('day');
   const scale = extScale ?? intScale;
@@ -37,7 +40,6 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number; isMilestone: boolean; startX: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const calendarScrollRef = useRef<HTMLDivElement>(null);
-  const dateHeaderTranslateRef = useRef<HTMLDivElement>(null);
   const movedRef = useRef(false);
   const [viewportW, setViewportW] = useState(0);
   const [pan, setPan] = useState<{ startX: number; startScroll: number; taskId?: string } | null>(null);
@@ -95,7 +97,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
       syncProjectDates(res.data.tasks);
       onTaskUpdated?.();
     } catch {
-      alert('自动排期失败(需项目经理/管理员权限)');
+      toast.error('自动排期失败(需项目经理/管理员权限)');
       await load();
     } finally {
       setScheduling(false);
@@ -268,44 +270,30 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     /* eslint-disable-next-line */
   }, [createDrag, preview, px, projectId, range]);
 
-  // 测量外层滚动容器宽度,用于把日历铺满界面
+  // 测量滚动容器宽度,用于把日历铺满界面（hideLeftPanel 模式下滚动容器为外部传入的右面板）
   useEffect(() => {
-    const el = calendarScrollRef.current;
+    const el = (hideLeftPanel ? (scrollRef ?? calendarScrollRef) : calendarScrollRef).current;
     if (!el) return;
     const measure = () => setViewportW(el.clientWidth);
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [data, hideLeftPanel]);
-
-  // hideLeftPanel 模式:日期抬头不在 overflow-x:auto 容器内(否则 CSS 强制 overflow-y:hidden 拦截 sticky),
-  // 改用 transform 同步水平滚动位置,sticky top-0 相对外层垂直滚动容器生效
-  useEffect(() => {
-    if (!hideLeftPanel) return;
-    const content = dateHeaderTranslateRef.current;
-    const scroller = calendarScrollRef.current;
-    if (!content || !scroller) return;
-    const onScroll = () => {
-      content.style.transform = `translateX(${-scroller.scrollLeft}px)`;
-    };
-    onScroll();
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    return () => scroller.removeEventListener('scroll', onScroll);
-    // chartW 由 viewportW/data/scale 推导,这些变化时重新同步 transform
-  }, [hideLeftPanel, viewportW, data, scale]);
+  }, [data, hideLeftPanel, scrollRef]);
 
   // 拖动时间轴空白处左右平移(调整关注区域)
   const onPanDown = (e: React.MouseEvent, taskId?: string) => {
-    if (!calendarScrollRef.current) return;
+    const scroller = (hideLeftPanel ? (scrollRef ?? calendarScrollRef) : calendarScrollRef).current;
+    if (!scroller) return;
     movedRef.current = false;
-    setPan({ startX: e.clientX, startScroll: calendarScrollRef.current.scrollLeft, taskId });
+    setPan({ startX: e.clientX, startScroll: scroller.scrollLeft, taskId });
   };
   useEffect(() => {
     if (!pan) return;
+    const scroller = (hideLeftPanel ? (scrollRef ?? calendarScrollRef) : calendarScrollRef).current;
     const onMove = (e: MouseEvent) => {
       if (Math.abs(e.clientX - pan.startX) > 4) movedRef.current = true;
-      if (calendarScrollRef.current) calendarScrollRef.current.scrollLeft = pan.startScroll - (e.clientX - pan.startX);
+      if (scroller) scroller.scrollLeft = pan.startScroll - (e.clientX - pan.startX);
     };
     const onUp = () => {
       if (!movedRef.current && pan.taskId) onRowClick?.(pan.taskId);
@@ -317,9 +305,9 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     /* eslint-disable-next-line */
   }, [pan]);
 
-  if (loading && !data) return <div className="p-8 text-center text-gray-400">加载甘特图...</div>;
+  if (loading && !data) return <div className="p-8 text-center text-[var(--ui-text-tertiary)]">加载甘特图...</div>;
   if (!data || !range) return null;
-  if (data.tasks.length === 0) return <div className="p-8 text-center text-gray-400">该项目还没有任务,先在"项目详情"中添加任务。</div>;
+  if (data.tasks.length === 0) return <div className="p-8 text-center text-[var(--ui-text-tertiary)]">该项目还没有任务,先在"项目详情"中添加任务。</div>;
 
   // 日历铺满可视宽度:不足时向后补天数填满
   const availChartW = Math.max(0, viewportW - (hideLeftPanel ? 0 : LEFT_W));
@@ -353,10 +341,10 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   });
 
   const dateHeader = (
-    <div className="bg-gray-50 border-b border-gray-200 relative flex items-center" style={{ width: chartW, height: ROW_H, flexShrink: 0, cursor: pan ? 'grabbing' : 'grab' }}
+    <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] relative flex items-center" style={{ width: chartW, height: ROW_H, flexShrink: 0, cursor: pan ? 'grabbing' : 'grab' }}
       onMouseDown={onPanDown}>
           {tickList.map((tk, i) => (
-            <div key={i} className={`absolute top-0 text-[10px] flex items-center ${tk.major ? 'text-gray-600' : 'text-gray-300'}`}
+            <div key={i} className={`absolute top-0 text-[10px] flex items-center ${tk.major ? 'text-[var(--ui-text-secondary)]' : 'text-gray-300'}`}
               style={{ left: tk.x, height: ROW_H, borderLeft: tk.major ? '1px solid #e5e7eb' : 'none', paddingLeft: 2 }}>
               {tk.label}
             </div>
@@ -373,15 +361,22 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
             </marker>
           </defs>
           {hasProject && (
+            <>
             <rect x={0} y={0} width={chartW} height={ROW_H}
-              fill="#f9fafb" style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e)} />
+              fill="var(--ui-bg-subtle)" style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e)} />
+            <rect x={0} y={ROW_H - 1} width={chartW} height={1} fill="var(--ui-border)" pointerEvents="none" />
+            </>
           )}
           {visibleTasks.map((t, i) => (
-            <rect key={`bg-${t.id}`} x={0} y={(i + taskRowOffset) * ROW_H} width={chartW} height={ROW_H}
-              fill={hoveredId === t.id ? '#f0f9ff' : (i % 2 ? '#fafafa' : '#fff')}
+            <g key={`bg-${t.id}`}>
+            <rect x={0} y={(i + taskRowOffset) * ROW_H} width={chartW} height={ROW_H}
+              fill={hoveredId === t.id ? 'var(--ui-highlight-bg)' : 'var(--ui-bg-surface)'}
               onMouseEnter={() => setHovered(t.id)}
               onMouseLeave={() => setHovered(null)}
               style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e, t.id)} />
+            {/* 行分割线：与左侧行 border-b 对齐 */}
+            <rect x={0} y={(i + taskRowOffset + 1) * ROW_H - 1} width={chartW} height={1} fill="var(--ui-border)" pointerEvents="none" />
+            </g>
           ))}
           {todayX >= 0 && todayX <= chartW && (
             <line x1={todayX} y1={0} x2={todayX} y2={chartH} stroke="#f97316" strokeWidth={1} strokeDasharray="3,3" />
@@ -395,7 +390,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
               const w = Math.max(px, (daysBetween(ps, pe) + 1) * px);
               const y = (ROW_H - BAR_H) / 2;
               return (
-                <rect x={x} y={y} width={w} height={12} rx={3} fill="#93c5fd" opacity={0.7} />
+                <rect x={x} y={y} width={w} height={12} rx={3} fill="var(--ui-highlight-bg)" opacity={0.7} />
               );
             })()
           )}
@@ -453,28 +448,25 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   if (hideLeftPanel) {
     return (
       <div className="min-w-0 flex-1">
-        {/* 日期抬头:不在 overflow 容器内,sticky top-0 穿透到外层垂直滚动容器;transform 同步水平位置 */}
-        <div className="sticky top-0 bg-gray-50" style={{ height: ROW_H, zIndex: 1 }}>
-          <div ref={dateHeaderTranslateRef} style={{ width: chartW, willChange: 'transform' }}>
-            {dateHeader}
-          </div>
+        {/* 日期抬头:直接放在外部右面板滚动容器内,sticky top-0 垂直吸顶;宽度与图表一致随水平滚动,
+            水平滚动条常驻右面板底部(参考 CAD 工作台 BOM 匹配表) */}
+        <div className="sticky top-0 z-30 bg-[var(--ui-bg-subtle)]" style={{ height: ROW_H }}>
+          {dateHeader}
         </div>
-        {/* 图表区域:水平滚动 */}
-        <div ref={calendarScrollRef} className="overflow-x-auto" style={{ overflowY: 'hidden' }}>
-          {svgPart}
-        </div>
+        {/* 图表区域:与日期抬头同宽,由右面板统一双向滚动 */}
+        {svgPart}
       </div>
     );
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
       <div ref={calendarScrollRef} className="overflow-auto" style={{ maxHeight: '70vh' }}
            onMouseLeave={() => setHovered(null)}>
         {/* 表头行:overflow-auto 直接子元素,sticky top-0 固定垂直 */}
         <div className="sticky top-0 z-30 flex" style={{ height: ROW_H, width: LEFT_W + chartW }}>
           {/* 左侧表头:sticky left-0 固定水平 */}
-          <div className="bg-gray-50 border-b border-gray-200 sticky left-0 z-30 flex items-center text-sm font-medium text-gray-500"
+          <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky left-0 z-30 flex items-center text-sm font-medium text-[var(--ui-text-secondary)]"
             style={{ width: LEFT_W, height: ROW_H, flexShrink: 0 }}>
             <span className="shrink-0 truncate text-left pl-2" style={{ width: CODE_W }}>任务编号</span>
             <span className="px-1 flex-1 min-w-0 truncate text-left">任务名称</span>
@@ -486,7 +478,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
         </div>
         {/* 内容行:左侧任务列表 + 右侧图表,共用同一滚动容器 */}
         <div className="flex" style={{ width: LEFT_W + chartW }}>
-          <div className="sticky left-0 z-20 bg-white" style={{ width: LEFT_W, flexShrink: 0 }}>
+          <div className="sticky left-0 z-20 bg-[var(--ui-bg-surface)]" style={{ width: LEFT_W, flexShrink: 0 }}>
             <SharedLeftPanel
               tasks={visibleTasks}
               expanded={expanded}

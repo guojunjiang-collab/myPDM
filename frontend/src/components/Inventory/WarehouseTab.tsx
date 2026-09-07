@@ -3,7 +3,14 @@ import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
+import FormModal from '../ui/FormModal';
+import FormField from '../ui/FormField';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
 import type { Warehouse } from '../../types';
+import { useTableSort } from '../../hooks/useTableSort';
 
 const WH_TYPES = [
   { value: 'raw', label: '原料库' },
@@ -12,14 +19,18 @@ const WH_TYPES = [
   { value: 'general', label: '通用' },
 ];
 
-const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500';
-
 export default function WarehouseTab() {
   const { warehouses, loadWarehouses, users } = useInventoryStore();
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Partial<Warehouse> | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // 保存 loading/错误（阶段2c 补缺口）
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // 客户端排序
+  const { sortedData: sortedWarehouses, sortField, sortDirection, handleSort } = useTableSort<Warehouse>(warehouses);
 
   const reload = async () => {
     setLoading(true);
@@ -29,10 +40,17 @@ export default function WarehouseTab() {
 
   const save = async () => {
     if (!editing) return;
-    if (editing.id) await inventoryApi.updateWarehouse(editing.id, editing);
-    else await inventoryApi.createWarehouse(editing);
-    setEditing(null);
-    await reload();
+    setSaving(true); setSaveError(null);
+    try {
+      if (editing.id) await inventoryApi.updateWarehouse(editing.id, editing);
+      else await inventoryApi.createWarehouse(editing);
+      setEditing(null);
+      await reload();
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.detail || '保存失败，请重试');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -53,40 +71,39 @@ export default function WarehouseTab() {
       <div className="flex gap-2 mb-4 shrink-0">
         <div className="flex-1" />
         {canEdit() && (
-          <button onClick={() => setEditing({ code: '', name: '', type: 'general' })}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建仓库</button>
+          <Button onClick={() => setEditing({ code: '', name: '', type: 'general' })}>+ 新建仓库</Button>
         )}
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">类型</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">默认库管员</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+              <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Warehouse)} className="text-left">编码</SortableTh>
+              <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Warehouse)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="type" active={sortField === 'type'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Warehouse)} className="text-left">类型</SortableTh>
+              <SortableTh className="text-left">默认库管员</SortableTh>
+              <SortableTh align="right">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : warehouses.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : warehouses.map((w) => (
-              <tr key={w.id} className="hover:bg-gray-50">
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
+            ) : sortedWarehouses.map((w) => (
+              <tr key={w.id} className="hover:bg-[var(--ui-bg-hover)]">
                 <td className="px-4 py-3 text-sm font-medium">{w.code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{w.name}</td>
                 <td className="px-4 py-3 text-sm font-medium">{WH_TYPES.find((t) => t.value === w.type)?.label || w.type || '-'}</td>
                 <td className="px-4 py-3 text-sm font-medium">{users.find((u) => u.id === w.default_keeper_id)?.real_name || '-'}</td>
                 <td className="px-4 py-3 text-right text-sm space-x-1">
                   {canEdit() && (
-                    <button onClick={() => setEditing(w)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
+                    <Button variant="link" size="xs" className="mr-3" onClick={() => setEditing(w)}>编辑</Button>
                   )}
                   {isAdmin() && (
-                    <button onClick={() => setDeleteId(w.id)} className="text-red-600 hover:text-red-800">删除</button>
+                    <Button variant="danger" size="xs" onClick={() => setDeleteId(w.id)}>删除</Button>
                   )}
                 </td>
               </tr>
@@ -95,44 +112,44 @@ export default function WarehouseTab() {
         </table>
       </div>
 
-      {/* 新建/编辑弹窗 */}
-      <Modal open={!!editing} title={editing?.id ? '编辑仓库' : '新建仓库'} onClose={() => setEditing(null)} width="md">
+      {/* 新建/编辑弹窗（FormModal + FormField 统一 label/footer/saving/error） */}
+      <FormModal
+        open={!!editing}
+        title={editing?.id ? '编辑仓库' : '新建仓库'}
+        onClose={() => { setEditing(null); setSaveError(null); }}
+        width="md"
+        onSubmit={save}
+        saving={saving}
+        error={saveError}
+      >
         {editing && (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">编码</label>
-              <input placeholder="仓库编码" value={editing.code || ''} disabled={!!editing.id}
-                onChange={(e) => setEditing({ ...editing, code: e.target.value })} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">名称</label>
-              <input placeholder="仓库名称" value={editing.name || ''}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">类型</label>
-              <select value={editing.type || 'general'}
-                onChange={(e) => setEditing({ ...editing, type: e.target.value })} className={inputCls}>
+          <>
+            <FormField label="编码" required>
+              <Input placeholder="仓库编码" value={editing.code || ''} disabled={!!editing.id}
+                onChange={(e) => setEditing({ ...editing, code: e.target.value })} />
+            </FormField>
+            <FormField label="名称" required>
+              <Input placeholder="仓库名称" value={editing.name || ''}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            </FormField>
+            <FormField label="类型">
+              <Select value={editing.type || 'general'}
+                onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
                 {WH_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">默认库管员</label>
-              <select value={editing.default_keeper_id || ''}
-                onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })} className={inputCls}>
+              </Select>
+            </FormField>
+            <FormField label="默认库管员">
+              <Select value={editing.default_keeper_id || ''}
+                onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })}>
                 <option value="">（无默认库管员）</option>
                 {users.filter((u) => u.role !== 'guest').map((u) => (
                   <option key={u.id} value={u.id}>{u.real_name}</option>
                 ))}
-              </select>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
-              <button onClick={save} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存</button>
-            </div>
-          </div>
+              </Select>
+            </FormField>
+          </>
         )}
-      </Modal>
+      </FormModal>
 
       {/* 删除确认 */}
       <ConfirmModal

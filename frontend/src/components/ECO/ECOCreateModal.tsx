@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Modal } from '../Modal';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Modal, MODAL_Z } from '../Modal';
 import { toast } from '../Toast';
 import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
@@ -8,18 +8,19 @@ import type { ECORequest, ECRDocumentLink } from '../../types';
 import VersionSelectModal from '../VersionSelectModal';
 import PartDetailModal from '../PartDetailModal';
 import EntityEditModal from '../EntityEditModal';
-
-const statusTag = (s: string) => {
-  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  const colors: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
-  };
-  return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
-};
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
+import Textarea from '../ui/Textarea';
+import TreeToggle from '../ui/TreeToggle';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 import { ECOEditView } from './ECOEditView';
-import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
+import DocumentPicker from '../DocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
+import Tabs from '../ui/Tabs';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -92,12 +93,27 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [bomData, setBomData] = useState<{ up: any[]; down: any[] } | null>(null);
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  // Tab 分页（与详情页一致：基本信息/ECR变更分析/关联图文档/审批/工程变更结果）
+  const [activeTab, setActiveTab] = useState<'info' | 'ecr' | 'docs' | 'reviewers' | 'items'>('info');
   const [showEcrPicker, setShowEcrPicker] = useState(false);
   const [showReleasePicker, setShowReleasePicker] = useState(false);
   const [releaseItems, setReleaseItems] = useState<any[]>([]);
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
+
+  // 关联图文档表排序（值混合 link 顶层与 docData，包装扁平排序键）
+  const sortableDocLinks = useMemo(() => documentLinks.map((link: any) => {
+    const doc = docData[link.document_id];
+    return {
+      ...link,
+      _code: doc?.code || link.document_code || '',
+      _name: doc?.name || link.document_name || '',
+      _version: doc?.version || link.document_version || '',
+      _status: doc?.status || '',
+    };
+  }), [documentLinks, docData]);
+  const { sortedData: sortedDocLinks, sortField: docSortField, sortDirection: docSortDirection, handleSort: handleDocSort } = useTableSort<any>(sortableDocLinks, { fieldComparators: { _version: (a, b) => compareVersions(String(a), String(b)) } });
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const [releaseVersionState, setReleaseVersionState] = useState<{ itemIdx: number; entityType: string; entityId: string; entityName: string } | null>(null);
   const [viewPartMasterId, setViewPartMasterId] = useState<string | null>(null);
@@ -158,14 +174,15 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         setReviewMode(editingEco.review_mode || 'all');
         setDocumentLinks(editingEco.document_links || []);
         setReleaseItems(editingEco.release_items || []);
-        // 刷新 release_items 状态（避免显示过期状态）
+        // 刷新 release_items 状态（避免显示过期状态），并用 master.type 权威修正类型（历史数据可能错标）
         (async () => {
           const items = editingEco.release_items || [];
           if (items.length > 0) {
             const refreshed = await Promise.all(items.map(async (ri: any) => {
               try {
-                const entity = await partsApi.get(ri.entity_id);
-                return { ...ri, status: entity.latest_revision?.status };
+                const rev = await partsApi.getRevision(ri.entity_id);
+                const master = await partsApi.get(rev.master_id);
+                return { ...ri, status: rev.status, entity_version: rev.version, entity_code: master.code, entity_name: master.name, entity_type: master.type === 'assembly' ? 'assembly' : 'part' };
               } catch { return ri; }
             }));
             setReleaseItems(refreshed);
@@ -182,6 +199,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         setReleaseItems([]);
       }
       setErrors({});
+      setActiveTab('info');
     }
   }, [open, editingEco]);
 
@@ -193,7 +211,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
       if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
     }, 0);
     return () => clearTimeout(timer);
-  }, [open, description]);
+  }, [open, description, activeTab]);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -388,183 +406,213 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   };
 
   return (
-    <Modal open={open} title={editingEco ? '编辑 ECO' : '新建 ECO'} onClose={onClose} width="3xl">
-      <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-        {ecrTitle && (
-          <div className="text-sm text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-            来源 ECR: {ecrTitle}
+    <Modal open={open} title={editingEco ? '编辑 ECO' : '新建 ECO'} onClose={onClose} width="3xl" height="75vh"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>取消</Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? '保存中...' : (localEco ? '保存' : '创建')}
+          </Button>
+        </>
+      }
+    >
+      <div className="h-full flex flex-col min-h-0">
+        {/* 常驻摘要条：ECO 编号（只读）+ 标题（必填） */}
+        <div className="grid grid-cols-2 gap-4 shrink-0 mb-3">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECO 编号</label>
+            <Input size="xs" type="text" value={localEco?.eco_number || ''} disabled
+              placeholder="新建时自动生成" />
           </div>
-        )}
-
-        {/* 基本字段 - 卡片式 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">ECO 编号</label>
-            <input type="text" value={localEco?.eco_number || ''} disabled
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-400" placeholder="新建时自动生成" />
-          </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">标题 <span className="text-red-500">*</span></label>
-            <input type="text" value={title}
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">标题 <span className="text-red-500">*</span></label>
+            <Input size="xs" type="text" value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.title ? 'border-red-500' : 'border-gray-200'}`}
+              className={errors.title ? '!border-red-500' : ''}
               placeholder="请输入 ECO 标题" />
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
         </div>
 
+        {/* Tab 栏（必填缺失红点提示） */}
+        <div className="shrink-0 mb-3">
+          <Tabs
+            items={[
+              { key: 'info', label: <span>基本信息{!title.trim() && <span className="ml-1 text-red-500">●</span>}</span> },
+              { key: 'ecr', label: 'ECR变更分析' },
+              { key: 'docs', label: '关联图文档' },
+              { key: 'reviewers', label: <span>审批{reviewers.some(r => !r.user_id) && <span className="ml-1 text-red-500">●</span>}</span> },
+              { key: 'items', label: '工程变更结果' },
+            ]}
+            activeKey={activeTab}
+            onChange={(k) => setActiveTab(k as any)}
+          />
+        </div>
+
+        {/* Tab 内容区 */}
+        <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
+          {activeTab === 'info' && (
+            <>
+        {ecrTitle && (
+          <div className="text-sm text-[var(--ui-text-secondary)] bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            来源 ECR: {ecrTitle}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">变更原因 <span className="text-red-500">*</span></label>
-            <select value={reason} onChange={(e) => setReason(e.target.value)}
-              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.reason ? 'border-red-400' : 'border-gray-200'}`}>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更原因 <span className="text-red-500">*</span></label>
+            <Select size="xs" value={reason} onChange={(e) => setReason(e.target.value)}
+              className={errors.reason ? '!border-red-400' : ''}>
               {REASON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </Select>
             {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">变更类别</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更类别</label>
+            <Select size="xs" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </Select>
           </div>
-          <div className="col-span-2 md:col-span-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
+          <div className="col-span-2 md:col-span-1 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
             <div className="flex gap-2 pt-0.5 flex-wrap">
               {PRIORITY_OPTIONS.map((o) => (
                 <label key={o.value} className="inline-flex items-center gap-0.5 cursor-pointer select-none text-xs">
                   <input type="radio" name="priority" value={o.value} checked={priority === o.value}
                     onChange={(e) => setPriority(e.target.value)} className="w-3 h-3 text-primary-600" />
-                  <span className="text-gray-600">{o.label}</span>
+                  <span className="text-[var(--ui-text-secondary)]">{o.label}</span>
                 </label>
               ))}
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
-            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
+            <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}>
               <option value="all">会签（全部通过）</option>
               <option value="any">或签（任一通过）</option>
-            </select>
+            </Select>
           </div>
         </div>
 
-        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-          <label className="block text-xs text-gray-500 mb-0.5">变更描述</label>
-          <textarea ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
+        <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+          <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更描述</label>
+          <Textarea size="xs" ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
             rows={1} style={{ minHeight: '38px', resize: 'none' }}
-            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 overflow-hidden"
+            className="overflow-hidden"
             placeholder="变更详细描述（选填）" />
         </div>
-
+            </>
+          )}
+          {activeTab === 'reviewers' && (
+            <>
         {editingEco && <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">👤 审批人</label>
-            <button type="button" onClick={addReviewer}
-              className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+            <Button size="xs" type="button" onClick={addReviewer}>
               + 添加审批人
-            </button>
+            </Button>
           </div>
 
           {reviewers.length === 0 && (
-            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
+            <div className="text-center text-[var(--ui-text-tertiary)] py-3 text-sm border border-dashed border-gray-300 rounded-lg">
               暂无审批人，请点击上方按钮添加
             </div>
           )}
 
           <div className="space-y-2">
             {reviewers.map((reviewer, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <span className="text-xs text-gray-400 w-6">{reviewer.seq}</span>
-                <select value={reviewer.user_id}
+              <div key={index} className="flex items-center gap-3 p-3 bg-[var(--ui-bg-subtle)] rounded-lg border border-[var(--ui-border)]">
+                <span className="text-xs text-[var(--ui-text-tertiary)] w-6">{reviewer.seq}</span>
+                <Select value={reviewer.user_id}
                   onChange={(e) => updateReviewer(index, 'user_id', e.target.value)}
-                  className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="flex-1"
                   disabled={usersLoading}>
                   <option value="">{usersLoading ? '加载中...' : '请选择审批人'}</option>
                   {users.filter((u) => u.id !== currentUserId && (u.role === 'admin' || u.role === 'engineer')).map((u) => (
                     <option key={u.id} value={u.id}>{u.real_name} ({u.username}) - {u.role}</option>
                   ))}
-                </select>
-                <input type="number" value={reviewer.seq}
+                </Select>
+                <Input size="xs" type="number" value={reviewer.seq}
                   onChange={(e) => updateReviewer(index, 'seq', parseInt(e.target.value) || 1)}
-                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="!w-16 text-center"
                   min={1} />
-                <button type="button" onClick={() => removeReviewer(index)}
-                  className="text-red-400 hover:text-red-600 text-sm px-2" title="移除">✕</button>
+                <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(index)} title="移除">✕</Button>
               </div>
             ))}
           </div>
         </div>}
-
+            </>
+          )}
+          {activeTab === 'info' && (
+            <>
         {ecrItems && ecrItems.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">执行项（从 ECR 带入）</label>
-            <div className="border border-gray-200 rounded-lg divide-y max-h-40 overflow-auto">
+            <div className="border border-[var(--ui-border)] rounded-lg divide-y max-h-40 overflow-auto">
               {ecrItems.map((it, i) => (
                 <div key={i} className="px-3 py-2 text-sm flex justify-between items-center">
                   <span>{it.entity_name}</span>
-                  <span className="text-gray-400 text-xs">{it.action}</span>
+                  <span className="text-[var(--ui-text-tertiary)] text-xs">{it.action}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
-
+            </>
+          )}
+          {activeTab === 'docs' && (
+            <>
         {editingEco && <div>
         {/* 关联图文档 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
-            <button type="button" onClick={() => setShowDocPicker(true)}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联图文档</h4>
+            <Button size="sm" type="button" onClick={() => setShowDocPicker(true)}>+ 关联图文档</Button>
           </div>
           <div className="border rounded-lg overflow-hidden">
             {documentLinks.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">暂无关联图文档</div>
+              <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无关联图文档</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    <SortableTh sortKey="_code" active={docSortField === '_code'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档编号</SortableTh>
+                    <SortableTh sortKey="_name" active={docSortField === '_name'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档名称</SortableTh>
+                    <SortableTh sortKey="_version" active={docSortField === '_version'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">版本</SortableTh>
+                    <SortableTh sortKey="_status" active={docSortField === '_status'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">状态</SortableTh>
                     {docFieldDefs.map((def) => (
-                      <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                      <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
                     ))}
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
+                    <SortableTh className="text-left">附件</SortableTh>
+                    <SortableTh className="text-center whitespace-nowrap w-28">操作</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {documentLinks.map((link) => {
+                  {sortedDocLinks.map((link) => {
                     const doc = docData[link.document_id];
                     const atts = docAttachments[link.document_id] || [];
                     return (
-                      <tr key={link.document_id} className="hover:bg-gray-50">
+                      <tr key={link.document_id} className="hover:bg-[var(--ui-bg-hover)]">
                         <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
                         <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
-                        <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
-                        <td className="px-3 py-2">{doc ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span> : '-'}</td>
+                        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.version || link.document_version || '-'}</td>
+                        <td className="px-3 py-2">{doc ? <Badge status={doc.status} /> : '-'}</td>
                         {docFieldDefs.map((def) => {
                           const vals = docCustomValues[link.document_id] || {};
                           const val = vals[def.id];
                           return (
-                            <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
+                            <td key={def.id} className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
                               {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
                             </td>
                           );
                         })}
-                        <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
                         <td className="px-3 py-2 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            <button type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}
-                              className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">选择</button>
-                            <button type="button" onClick={() => setDocumentLinks((prev) => prev.filter((d) => d.document_id !== link.document_id))}
-                              className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                            <Button variant="link" size="xs" type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}>选择</Button>
+                            <Button variant="danger" size="xs" type="button" onClick={() => setDocumentLinks((prev) => prev.filter((d) => d.document_id !== link.document_id))}>移除</Button>
                           </div>
                         </td>
                       </tr>
@@ -576,28 +624,29 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
         </div>
         </div>}
-
+            </>
+          )}
+          {activeTab === 'ecr' && (
+            <>
         {/* ECR 变更分析（仅编辑模式） */}
         {!!localEco && (
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">ECR 变更分析{localEco.ecr_number ? `（${localEco.ecr_number}）` : ''}</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">ECR 变更分析{localEco.ecr_number ? `（${localEco.ecr_number}）` : ''}</h4>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setShowEcrPicker(true)}
-                className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
+              <Button size="sm" type="button" onClick={() => setShowEcrPicker(true)}>
                 {localEco.ecr_id ? '更换' : '+ 关联 ECR'}
-              </button>
+              </Button>
               {localEco.ecr_id && (
                 <>
-                  <button type="button" onClick={() => setResetKey(k => k + 1)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>
-                  <button type="button" onClick={async () => {
+                  <Button variant="secondary" size="sm" type="button" onClick={() => setResetKey(k => k + 1)}>还原</Button>
+                  <Button variant="secondary" size="sm" type="button" onClick={async () => {
                     try {
                       await ecoApi.update(localEco.id, { ecr_id: null } as any);
                       setLocalEco({ ...localEco, ecr_id: undefined, ecr_number: undefined });
                       toast.success('已解除 ECR 关联');
                     } catch { toast.error('操作失败'); }
-                  }} className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-500 hover:bg-gray-50">解除关联</button>
+                  }}>解除关联</Button>
                 </>
               )}
             </div>
@@ -620,65 +669,58 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
           resetKey={resetKey} hideResetButton />
         </div>
         )}
-
+            </>
+          )}
+          {activeTab === 'items' && (
+            <>
         {/* 工程变更结果（仅编辑模式） */}
         {editingEco && (
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
-            <button type="button" onClick={() => setShowReleasePicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联零部件</button>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">工程变更结果</h4>
+            <Button size="sm" type="button" onClick={() => setShowReleasePicker(true)}>+ 关联零部件</Button>
           </div>
           {releaseItems.length === 0 ? (
-            <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
+            <div className="border rounded-lg px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无工程变更结果</div>
           ) : (
-            <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} onRemove={(idx) => { const newItems = releaseItems.filter((_, i) => i !== idx); saveReleaseItems(newItems); }} onVersionSelect={(idx) => { const item = releaseItems[idx]; setReleaseVersionState({ itemIdx: idx, entityType: item.entity_type, entityId: item.entity_id, entityName: item.entity_name }); }} />
+            <ReleaseItemsTable items={releaseItems} onViewItem={viewItem}
+              onRemove={(item) => { saveReleaseItems(releaseItems.filter((r) => r !== item)); }}
+              onVersionSelect={(item) => { const idx = releaseItems.indexOf(item); setReleaseVersionState({ itemIdx: idx, entityType: item.entity_type, entityId: item.entity_id, entityName: item.entity_name }); }} />
           )}
         </div>
         )}
-      </div>
-
-      {/* 按钮 */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
-          取消
-        </button>
-        <button onClick={handleSubmit} disabled={loading}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
-          {loading ? '保存中...' : (localEco ? '保存' : '创建')}
-        </button>
-      </div>
-
-      {/* 图文档选择器 — 独立弹窗 */}
-      <ECRDocumentPicker
-        open={showDocPicker}
-        onClose={() => setShowDocPicker(false)}
-        onSelect={(docs: ECRDocumentLink[]) => {
-          setDocumentLinks(prev => {
-            const existing = new Set(prev.map(d => d.document_id));
-            const newDocs = docs.filter(d => !existing.has(d.document_id));
-            return [...prev, ...newDocs];
-          });
-          setShowDocPicker(false);
-        }}
-        alreadyLinked={documentLinks.map(d => d.document_id)}
-      />
-
-      {/* ECR 选择弹窗 */}
-      {showEcrPicker && (
-      <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setShowEcrPicker(false)}>
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] overflow-auto p-4" onClick={e => e.stopPropagation()}>
-          <h4 className="text-sm font-semibold mb-3">选择 ECR</h4>
-          <EcrPicker onSelect={async (id, number) => {
-            try {
-              await ecoApi.update(localEco!.id, { ecr_id: id } as any);
-              setLocalEco(prev => prev ? { ...prev, ecr_id: id, ecr_number: number } : prev);
-              toast.success('ECR 关联成功');
-            } catch { toast.error('关联失败'); }
-            setShowEcrPicker(false);
-          }} />
+            </>
+          )}
         </div>
       </div>
-      )}
+
+      {/* 图文档选择器 — 独立弹窗（共享 DocumentPicker） */}
+      <DocumentPicker
+        open={showDocPicker}
+        onClose={() => setShowDocPicker(false)}
+        onConfirm={(items) => {
+          setDocumentLinks(prev => {
+            const existing = new Set(prev.map(d => d.document_id));
+            const newDocs = items
+              .filter(v => !existing.has(v.document_id))
+              .map(v => ({ document_id: v.document_id, document_code: '', document_name: '', document_version: '' }));
+            return [...prev, ...newDocs];
+          });
+        }}
+        existingDocIds={new Set(documentLinks.map(d => d.document_id))}
+      />
+
+      {/* ECR 选择弹窗（共享 Modal，zIndex 走 MODAL_Z.picker；height 限定防 ECR 长列表超高） */}
+      <Modal open={showEcrPicker} title="选择 ECR" onClose={() => setShowEcrPicker(false)} width="lg" height="70vh" zIndex={MODAL_Z.picker}>
+        <EcrPicker onSelect={async (id, number) => {
+          try {
+            await ecoApi.update(localEco!.id, { ecr_id: id } as any);
+            setLocalEco(prev => prev ? { ...prev, ecr_id: id, ecr_number: number } : prev);
+            toast.success('ECR 关联成功');
+          } catch { toast.error('关联失败'); }
+          setShowEcrPicker(false);
+        }} />
+      </Modal>
 
       {/* 版本选择器 */}
       <VersionSelectModal
@@ -775,31 +817,31 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
     const map: Record<string, string> = { draft: '草稿', reviewing: '审核中', approved: '已批准', rejected: '已驳回', executing: '执行中', completed: '已完成', closed: '已关闭' };
     return map[s] || s;
   };
+  const { sortedData: sortedResults, sortField, sortDirection, handleSort } = useTableSort<any>(results);
   return (
     <div>
       <div className="flex gap-2 mb-3">
-        <input value={search} onChange={e => setSearch(e.target.value)}
+        <Input value={search} onChange={e => setSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          placeholder="搜索 ECR 编号或标题..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm" />
-        <button onClick={handleSearch} disabled={searching}
-          className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm disabled:opacity-50">搜索</button>
+          placeholder="搜索 ECR 编号或标题..." className="flex-1" />
+        <Button size="sm" onClick={handleSearch} disabled={searching}>搜索</Button>
       </div>
-      {searching ? <p className="text-xs text-gray-400 text-center py-4">加载中...</p> : (
+      {searching ? <p className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">加载中...</p> : (
         <table className="w-full text-sm border-collapse">
-          <thead><tr className="bg-gray-50 border-b">
-            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs">ECR 编号</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs">标题</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs w-20">状态</th>
+          <thead><tr className="bg-[var(--ui-bg-subtle)] border-b">
+            <SortableTh sortKey="ecr_number" active={sortField === 'ecr_number'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left font-medium text-xs">ECR 编号</SortableTh>
+            <SortableTh sortKey="title" active={sortField === 'title'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left font-medium text-xs">标题</SortableTh>
+            <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left font-medium text-xs w-20">状态</SortableTh>
           </tr></thead>
           <tbody className="divide-y">
-            {results.map(e => (
+            {sortedResults.map(e => (
               <tr key={e.id || e.ecr_number} className="hover:bg-blue-50 cursor-pointer" onClick={() => onSelect(e.id || e.ecr_number, e.ecr_number)}>
                 <td className="px-3 py-2 font-mono text-xs text-blue-600">{e.ecr_number || '-'}</td>
                 <td className="px-3 py-2 text-xs truncate max-w-0">{e.title || '无标题'}</td>
                 <td className="px-3 py-2 text-xs">{stl(e.status)}</td>
               </tr>
             ))}
-            {results.length === 0 && <tr><td colSpan={3} className="text-xs text-gray-400 text-center py-4">无数据</td></tr>}
+            {results.length === 0 && <tr><td colSpan={3} className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">无数据</td></tr>}
           </tbody>
         </table>
       )}
@@ -807,72 +849,99 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
   );
 }
 
-function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void; onRemove?: (idx: number) => void; onVersionSelect?: (idx: number) => void }) {
+// 部件类型判定：'component' 为历史遗留值，语义等同 'assembly'（部件）
+const isAssemblyType = (t: string) => t === 'assembly' || t === 'component';
+
+function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void; onRemove?: (item: any) => void; onVersionSelect?: (item: any) => void }) {
   const [expanded, setExpanded] = useState<Record<string, any[]>>({});
   const [loadingIdx, setLoadingIdx] = useState<string | null>(null);
+  // 表头点击排序（件号/名称/版本/状态/用量）：顶层与各层子项统一排序（渲染时派生，切换排序即时生效于整棵树）
+  const { sortField, sortDirection, handleSort } = useTableSort<any>(items, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  // 排序 key → release item 实际字段映射
+  const fieldOf = (ri: any, f: string) => f === 'code' ? ri.entity_code : f === 'name' ? ri.entity_name : f === 'version' ? ri.entity_version : f === 'status' ? ri.status : ri.quantity;
+  const sortRows = useCallback((list: any[]) => {
+    if (!sortField || !sortDirection) return list;
+    return [...list].sort((a: any, b: any) => {
+      const aVal = fieldOf(a, String(sortField));
+      const bVal = fieldOf(b, String(sortField));
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      let cmp: number;
+      if (sortField === 'version') cmp = compareVersions(String(aVal), String(bVal));
+      else if (typeof aVal === 'number' && typeof bVal === 'number') cmp = aVal - bVal;
+      else cmp = String(aVal).localeCompare(String(bVal), 'zh-CN');
+      return sortDirection === 'desc' ? -cmp : cmp;
+    });
+  }, [sortField, sortDirection]);
+  const sortedItems = sortRows(items);
+  // 展开状态用稳定标识（entity_id/code），排序后展开不错位
+  const keyOf = (ri: any, fallback: string) => ri.entity_id || ri.entity_code || fallback;
 
-  const toggleExpand = async (idx: string, entityId: string, entityType: string) => {
-    if (expanded[idx]) { setExpanded(prev => { const n = {...prev}; delete n[idx]; return n; }); return; }
-    if (entityType !== 'assembly') return;
-    setLoadingIdx(idx);
+  const toggleExpand = async (key: string, entityId: string, entityType: string) => {
+    if (expanded[key]) { setExpanded(prev => { const n = {...prev}; delete n[key]; return n; }); return; }
+    if (!isAssemblyType(entityType)) return;
+    setLoadingIdx(key);
     try {
       const master = await partsApi.get(entityId);
       const revId = master.latest_revision?.id;
       if (!revId) { toast.error('无法获取最新版本'); return; }
       const rows = await partsApi.getBOM(revId);
-      const children = rows.map((c: any) => ({ entity_type: c.child_type === 'assembly' ? 'assembly' : 'part', entity_id: c.child_master_id, entity_code: c.child_code || '', entity_name: c.child_name || '', entity_version: c.child_version || '', spec: c.child_spec || '', status: c.child_status || '', quantity: c.quantity || 1 }));
-      setExpanded(prev => ({ ...prev, [idx]: children }));
+      const children = rows.map((c: any) => ({ entity_type: isAssemblyType(c.child_type) ? 'assembly' : 'part', entity_id: c.child_master_id, entity_code: c.child_code || '', entity_name: c.child_name || '', entity_version: c.child_version || '', spec: c.child_spec || '', status: c.child_status || '', quantity: c.quantity || 1 }));
+      setExpanded(prev => ({ ...prev, [key]: children }));
     } catch { toast.error('加载子项失败'); }
     finally { setLoadingIdx(null); }
   };
 
-  const renderRow = (ri: any, level: number, idx: string): React.ReactNode => {
-    const isAssembly = ri.entity_type === 'assembly';
-    const childRows = expanded[idx];
-    const rowNum = parseInt(idx.split('-')[0], 10);
+  const renderRow = (ri: any, level: number, key: string): React.ReactNode => {
+    const isAssembly = isAssemblyType(ri.entity_type);
+    const childRows = expanded[key];
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
-          <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-            <span>{'-'.repeat(level)}{level}</span>
-            {isAssembly && <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }} className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">{childRows ? '▼' : '▶'}</button>}
+        <tr key={key} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
+          <td className="relative px-3 py-2 font-medium whitespace-nowrap" style={{ paddingLeft: `calc(8px + ${level} * var(--ui-tree-indent))` }} onClick={(e) => e.stopPropagation()}>
+            {level > 0 && Array.from({ length: level }, (_, k) => (
+              <span key={k} className="absolute -top-px bottom-0 w-px bg-[var(--ui-border)] pointer-events-none" style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }} />
+            ))}
+            <span className="inline-flex items-center gap-1">
+              {isAssembly ? (
+                <TreeToggle expanded={!!childRows} onClick={() => toggleExpand(key, ri.entity_id, ri.entity_type)} size="sm" title={childRows ? '折叠' : '展开'} />
+              ) : (
+                <TreeToggle leaf size="sm" />
+              )}
+              <span className="text-sm">{ri.entity_code}</span>
+            </span>
           </td>
-          <td className="px-3 py-1.5 text-xs"><span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isAssembly ? '部件' : '零件'}</span></td>
-          <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
-          <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
-          <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
-          <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
-          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
-          <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
-          {(onRemove || onVersionSelect) && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}>
+          <td className="px-3 py-2">{ri.entity_name}</td>
+          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{ri.entity_version || 'A'}</td>
+          <td className="px-3 py-2 whitespace-nowrap">{ri.status ? <Badge status={ri.status} /> : '-'}</td>
+          <td className="px-3 py-2 text-center">{ri.quantity || 1}</td>
+          {(onRemove || onVersionSelect) && level === 0 && <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-1 justify-center">
-              {onVersionSelect && <button onClick={() => onVersionSelect(rowNum)} className="px-2 py-0.5 text-xs text-blue-500 hover:text-blue-700 rounded whitespace-nowrap">选择</button>}
-              {onRemove && <button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600 whitespace-nowrap">移除</button>}
+              {onVersionSelect && <Button variant="link" size="xs" onClick={() => onVersionSelect(ri)} className="whitespace-nowrap">选择</Button>}
+              {onRemove && <Button variant="danger" size="xs" onClick={() => onRemove(ri)} className="whitespace-nowrap">移除</Button>}
             </div>
           </td>}
-          {(onRemove || onVersionSelect) && level > 0 && <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}></td>}
+          {(onRemove || onVersionSelect) && level > 0 && <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}></td>}
         </tr>
-        {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
-        {loadingIdx === idx && <tr><td colSpan={(onRemove || onVersionSelect) ? 9 : 8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
+        {childRows && sortRows(childRows).map((child: any, j: number) => renderRow(child, level + 1, keyOf(child, `${key}-${j}`)))}
+        {loadingIdx === key && <tr><td colSpan={(onRemove || onVersionSelect) ? 6 : 5} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b"><tr>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">层级</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
-          <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
-          {(onRemove || onVersionSelect) && <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-28">操作</th>}
+        <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr className="sticky top-0 z-10">
+          <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2">件号</SortableTh>
+          <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2">中文名称</SortableTh>
+          <SortableTh sortKey="version" active={sortField === 'version'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2 w-14">版本</SortableTh>
+          <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2 w-20">状态</SortableTh>
+          <SortableTh sortKey="quantity" active={sortField === 'quantity'} direction={sortDirection} onSort={(k) => handleSort(k)} align="center" className="!px-3 !py-2 w-12">用量</SortableTh>
+          {(onRemove || onVersionSelect) && <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-28 select-none whitespace-nowrap">操作</th>}
         </tr></thead>
-        <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
+        <tbody className="divide-y">{sortedItems.map((ri, i) => renderRow(ri, 0, keyOf(ri, String(i))))}</tbody>
       </table>
     </div>
   );

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
+import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
 
 export default function ForcePasswordChange() {
   const navigate = useNavigate();
@@ -56,21 +58,21 @@ export default function ForcePasswordChange() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--ui-bg-subtle)]">
       <div className="flex justify-end p-4">
         <button
           type="button"
           onClick={handleLogout}
-          className="text-sm text-gray-500 hover:text-gray-700"
+          className="text-sm text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]"
         >
           退出登录
         </button>
       </div>
 
       <div className="flex justify-center px-4">
-        <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
+        <div className="w-full max-w-md p-8 bg-[var(--ui-bg-surface)] rounded-lg shadow-md">
           <h1 className="text-xl font-semibold mb-2">请修改密码</h1>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-[var(--ui-text-secondary)] mb-6">
             {user?.real_name ? `${user.real_name}，` : ''}
             你的密码需要重新设置后才能继续使用系统。这通常是因为你是首次登录，或管理员刚重置了你的密码。
           </p>
@@ -78,45 +80,43 @@ export default function ForcePasswordChange() {
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">原密码</label>
-              <input
+              <Input
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 required
               />
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
-              <input
+              <Input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 required
               />
-              <p className="mt-1 text-xs text-gray-400">至少8位，需包含大写字母、小写字母和数字</p>
+              <p className="mt-1 text-xs text-[var(--ui-text-tertiary)]">至少8位，需包含大写字母、小写字母和数字</p>
             </div>
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
-              <input
+              <Input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 required
               />
             </div>
 
             {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-            <button
+            <Button
               type="submit"
               disabled={submitting}
-              className="w-full py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="primary"
+              className="w-full"
             >
               {submitting ? '提交中...' : '确认修改'}
-            </button>
+            </Button>
           </form>
         </div>
       </div>

@@ -3,11 +3,16 @@ import { ecoApi } from '../../services/api';
 import type { ECORequest } from '../../types';
 import { canEdit, isAdmin, useAuthStore } from '../../stores/auth';
 import { toast } from '../Toast';
+import { ConfirmModal } from '../Modal';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
 import { ECOCreateModal } from './ECOCreateModal';
 import { ECODetailModal } from './ECODetailModal';
-import { ECRCcPicker } from '../ECR/ECRCcPicker';
-import { ECOCcPicker } from './ECOCcPicker';
+import { CcPicker } from '../CcPicker';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
+import { useServerSort } from '../../hooks/useServerSort';
 
 const PAGE_SIZE = 20;
 
@@ -45,10 +50,16 @@ export function ECOList() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const sort = useServerSort('created_at', 'desc');
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { page, page_size: PAGE_SIZE };
+      const params: Record<string, unknown> = {
+        page, page_size: PAGE_SIZE,
+        sort_field: sort.sortField ?? 'created_at',
+        sort_order: sort.sortOrder,
+      };
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
@@ -58,9 +69,12 @@ export function ECOList() {
       setTotal(data.total || 0);
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
-  }, [page, search, statusFilter, priorityFilter]);
+  }, [page, search, statusFilter, priorityFilter, sort.sortField, sort.sortOrder]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 排序变化时重置到第 1 页
+  useEffect(() => { setPage(1); }, [sort.sortField, sort.sortOrder]);
 
   const handleSubmit = async (id: string) => {
     setActionLoading(id);
@@ -77,12 +91,9 @@ export function ECOList() {
     try { await ecoApi.startExecution(id); toast.success('已开始执行'); load(); } catch { toast.error('执行失败'); }
     finally { setActionLoading(null); }
   };
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定删除该 ECO？')) return;
-    setActionLoading(id);
-    try { await ecoApi.delete(id); toast.success('已删除'); load(); } catch { toast.error('删除失败'); }
-    finally { setActionLoading(null); }
-  };
+  // 删除确认（状态驱动 ConfirmModal）
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const handleDelete = (id: string) => setConfirmDeleteId(id);
   const handleEdit = async (eco: ECORequest) => {
     const reqId = ++editReqId.current;
     try {
@@ -97,44 +108,37 @@ export function ECOList() {
     const isCreator = user?.id === eco.creator_id;
     const admin = isAdmin();
     const ccBtn = (
-      <button onClick={(e) => { e.stopPropagation(); setCcEcoId(eco.id); }}
-        className="text-purple-600 hover:text-purple-800 text-sm">
+      <Button variant="link" size="xs" onClick={(e) => { e.stopPropagation(); setCcEcoId(eco.id); }}>
         知会
-      </button>
+      </Button>
     );
     switch (eco.status) {
       case 'draft':
         return (
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && <>
-              <button onClick={(e) => { e.stopPropagation(); handleSubmit(eco.id); }} disabled={busy}
-                className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '提交'}</button>
-              <button onClick={(e) => { e.stopPropagation(); handleEdit(eco); }}
-                className="text-primary-600 hover:text-primary-800 text-sm mr-2">编辑</button>
-              <button onClick={(e) => { e.stopPropagation(); handleDelete(eco.id); }} disabled={busy}
-                className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '删除'}</button>
+              <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleSubmit(eco.id); }} disabled={busy}>{busy ? '...' : '提交'}</Button>
+              <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleEdit(eco); }}>编辑</Button>
+              <Button variant="danger" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleDelete(eco.id); }} disabled={busy}>{busy ? '...' : '删除'}</Button>
             </>}
             {ccBtn}
           </div>);
       case 'reviewing':
         return (
           <div className="flex gap-1 justify-end">
-            {isCreator && <button onClick={(e) => { e.stopPropagation(); handleWithdraw(eco.id); }} disabled={busy}
-              className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '撤回'}</button>}
+            {isCreator && <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleWithdraw(eco.id); }} disabled={busy}>{busy ? '...' : '撤回'}</Button>}
             {ccBtn}
           </div>);
       case 'approved':
         return (
           <div className="flex gap-1 justify-end">
-            {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); handleExecute(eco.id); }} disabled={busy}
-              className="text-green-600 hover:text-green-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '开始执行'}</button>}
+            {(isCreator || admin) && <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleExecute(eco.id); }} disabled={busy}>{busy ? '...' : '开始执行'}</Button>}
             {ccBtn}
           </div>);
       case 'executing':
         return (
           <div className="flex gap-1 justify-end">
-            {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); setExecId(eco.id); }}
-              className="text-orange-600 hover:text-orange-800 text-sm mr-2">执行</button>}
+            {(isCreator || admin) && <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); setExecId(eco.id); }}>执行</Button>}
             {ccBtn}
           </div>);
       case 'completed':
@@ -154,40 +158,38 @@ export function ECOList() {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <input type="text" placeholder="搜索..." value={search}
+        <Input type="text" placeholder="搜索..." value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+          className="flex-1 min-w-0" />
+        <Select className="!w-auto" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
           <option value="">全部状态</option>
           {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+        </Select>
+        <Select className="!w-auto" value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}>
           <option value="">全部优先级</option>
           {Object.entries(priorityLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
+        </Select>
         <div className="flex-1" />
-        {canEdit() && <button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建 ECO</button>}
+        {canEdit() && <Button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }}>+ 新建 ECO</Button>}
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">ECO 编号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">标题</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">状态</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">优先级</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建人</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建时间</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 whitespace-nowrap">操作</th>
+              <SortableTh sortKey="eco_number" active={sort.isActive('eco_number')} direction={sort.direction} onSort={sort.handleSort}>ECO 编号</SortableTh>
+              <SortableTh sortKey="title" active={sort.isActive('title')} direction={sort.direction} onSort={sort.handleSort}>标题</SortableTh>
+              <SortableTh sortKey="status" active={sort.isActive('status')} direction={sort.direction} onSort={sort.handleSort}>状态</SortableTh>
+              <SortableTh sortKey="priority" active={sort.isActive('priority')} direction={sort.direction} onSort={sort.handleSort}>优先级</SortableTh>
+              <SortableTh sortKey="creator_name" active={sort.isActive('creator_name')} direction={sort.direction} onSort={sort.handleSort}>创建人</SortableTh>
+              <SortableTh sortKey="created_at" active={sort.isActive('created_at')} direction={sort.direction} onSort={sort.handleSort}>创建时间</SortableTh>
+              <SortableTh align="right">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">加载中...</td></tr>)
-              : ecos.length === 0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">暂无数据</td></tr>)
+            {loading ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-[var(--ui-text-tertiary)]">加载中...</td></tr>)
+              : ecos.length === 0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-[var(--ui-text-tertiary)]">暂无数据</td></tr>)
                 : ecos.map(eco => (
-                  <tr key={eco.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(eco.id)}>
+                  <tr key={eco.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetailId(eco.id)}>
                     <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{eco.eco_number}</td>
                     <td className="px-4 py-3 text-sm font-medium max-w-48 truncate">{eco.title}</td>
                     <td className="px-4 py-3 font-medium whitespace-nowrap"><ECOStatusBadge status={eco.status} /></td>
@@ -202,26 +204,24 @@ export function ECOList() {
       </div>
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 shrink-0">
-          <span className="text-sm text-gray-500">共 {total} 条，第 {page} / {totalPages} 页</span>
+          <span className="text-sm text-[var(--ui-text-secondary)]">共 {total} 条，第 {page} / {totalPages} 页</span>
           <div className="flex gap-1 justify-end">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>上一页</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2).map((p, idx, arr) => (
-              <span key={p}>{idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-gray-400">...</span>}
-                <button onClick={() => setPage(p)} className={`px-3 py-1 border rounded text-sm ${p === page ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-300 hover:bg-gray-50'}`}>{p}</button></span>
+              <span key={p}>{idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-[var(--ui-text-tertiary)]">...</span>}
+                <Button variant={p === page ? 'primary' : 'secondary'} size="sm" onClick={() => setPage(p)}>{p}</Button></span>
             ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>下一页</Button>
           </div>
         </div>
       )}
       <ECOCreateModal open={createOpen || !!editingEco} onClose={() => { setCreateOpen(false); setEditingEco(null); }} onCreated={() => { setCreateOpen(false); setEditingEco(null); load(); }} editingEco={editingEco} />
-      {detailId && <ECODetailModal ecoId={detailId} onClose={() => setDetailId(null)} onRefresh={load} />}
-      {execId && <ECODetailModal ecoId={execId} onClose={() => setExecId(null)} onRefresh={load} executionMode />}
+      {detailId && <ECODetailModal ecoId={detailId} onClose={() => { setDetailId(null); load(); }} onRefresh={load} />}
+      {execId && <ECODetailModal ecoId={execId} onClose={() => { setExecId(null); load(); }} onRefresh={load} executionMode />}
       {ccEcoId && (
-        <ECRCcPicker
+        <CcPicker
           open={true}
-          ecrId={ccEcoId}
+          entityId={ccEcoId}
           onClose={() => setCcEcoId(null)}
           api={{
             get: (id: string) => ecoApi.detail(id),
@@ -230,7 +230,24 @@ export function ECOList() {
           }}
         />
       )}
-      {ccEcoId && <ECOCcPicker open={!!ccEcoId} ecoId={ccEcoId} onClose={() => setCcEcoId(null)} />}
+
+      {/* 删除 ECO 确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="确认删除"
+        content="确定删除该 ECO？"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setActionLoading(confirmDeleteId);
+          try { await ecoApi.delete(confirmDeleteId); toast.success('已删除'); load(); }
+          catch { toast.error('删除失败'); }
+          finally { setActionLoading(null); setConfirmDeleteId(null); }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

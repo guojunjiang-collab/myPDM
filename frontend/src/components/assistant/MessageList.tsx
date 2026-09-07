@@ -24,7 +24,7 @@ export default function MessageList() {
       {messages.map((m, i) => (
         <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
           <div className={`inline-block max-w-[90%] rounded-lg px-3 py-2 ${
-            m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
+            m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-[var(--ui-text-primary)]'}`}>
             {m.role === 'assistant'
               ? <><TextCard text={m.text} streaming={m.streaming} />
                   {m.cards.map(renderCard)}</>

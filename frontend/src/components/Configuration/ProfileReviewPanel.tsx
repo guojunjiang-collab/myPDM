@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { ProfileReviewer, ProfileReviewRecord } from '../../types';
+import Button from '../ui/Button';
+import Textarea from '../ui/Textarea';
 
 interface Props {
   reviewers: ProfileReviewer[];
@@ -21,12 +23,12 @@ export default function ProfileReviewPanel({ reviewers, records, reviewMode, can
 
   return (
     <div className="space-y-3">
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-[var(--ui-text-secondary)]">
         审批模式：{reviewMode === 'any' ? '或签（任一通过）' : '会签（全部通过）'}
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-gray-500">
+          <tr className="text-left text-[var(--ui-text-secondary)]">
             <th className="py-1">审批人</th>
             <th>结果</th>
             <th>意见</th>
@@ -49,32 +51,29 @@ export default function ProfileReviewPanel({ reviewers, records, reviewMode, can
       </table>
       {canReview && (
         <div className="flex flex-col gap-2 border-t pt-2">
-          <textarea
-            className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+          <Textarea
+            size="xs"
             rows={2}
             placeholder="审批意见（可选）"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
           <div className="flex gap-2">
-            <button
-              className="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700"
+            <Button variant="success" size="sm"
               onClick={() => onReview('approved', comment)}
             >
               通过
-            </button>
-            <button
-              className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700"
+            </Button>
+            <Button variant="danger" size="sm"
               onClick={() => onReview('rejected', comment)}
             >
               驳回
-            </button>
-            <button
-              className="px-3 py-1 rounded bg-gray-500 text-white text-sm hover:bg-gray-600"
+            </Button>
+            <Button variant="dark" size="sm"
               onClick={() => onReview('returned', comment)}
             >
               退回
-            </button>
+            </Button>
           </div>
         </div>
       )}

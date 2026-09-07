@@ -5,9 +5,16 @@ import { projectApi } from '../../services/projectApi';
 import { usersApi } from '../../services/api';
 import { can, useAuthStore } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
+import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
+import Textarea from '../../components/ui/Textarea';
+import SortableTh from '../../components/ui/SortableTh';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
+import { useTableSort } from '../../hooks/useTableSort';
 import MemberManageModal from './MemberManageModal';
 import DeliverableModal from './DeliverableModal';
 import TaskEditModal from './TaskEditModal';
@@ -16,19 +23,6 @@ import SharedLeftPanel from './SharedLeftPanel';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment, GanttTask } from '../../types/project';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
-const STATUS_CLASS: Record<ProjectStatus, string> = {
-  待启动: 'bg-gray-100 text-gray-500',
-  进行中: 'bg-blue-100 text-blue-800',
-  已完成: 'bg-green-100 text-green-800',
-  已暂停: 'bg-amber-100 text-amber-800',
-  已归档: 'bg-gray-100 text-gray-600',
-};
-const TASK_STATUS_CLASS: Record<TaskStatus, string> = {
-  未开始: 'bg-gray-100 text-gray-600',
-  进行中: 'bg-blue-50 text-blue-700',
-  已完成: 'bg-green-50 text-green-700',
-  挂起: 'bg-amber-50 text-amber-700',
-};
 
 function isOverdue(t: ProjectTask): boolean {
   if (!t.planned_end || t.status === '已完成') return false;
@@ -89,6 +83,10 @@ export default function Projects() {
   const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedProjectIdRef = useRef<string | null>(null);
   useEffect(() => { selectedProjectIdRef.current = selectedProjectId; }, [selectedProjectId]);
+  // 左右双滚动容器（参考 CAD 工作台 BOM 匹配表）：垂直滚动互相同步的 refs
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
 
   useEffect(() => {
     return () => { if (expandTimerRef.current) clearTimeout(expandTimerRef.current); };
@@ -201,6 +199,9 @@ export default function Projects() {
     (!statusFilter || p.status === statusFilter)
   );
 
+  // 客户端排序（全量数据）
+  const { sortedData: sortedProjects, sortField, sortDirection, handleSort } = useTableSort<Project>(filtered);
+
   const handleOpenCreate = () => {
     setEditingProject(null);
     setForm({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中', owner_id: '' });
@@ -289,6 +290,26 @@ export default function Projects() {
     if (selectedProjectId) { loadTasks(selectedProjectId); setGanttKey((k) => k + 1); }
   }, [selectedProjectId, loadTasks]);
 
+  // 左右两侧垂直滚动同步（参考 CAD 工作台 BOM 匹配表），
+  // 使左侧固定区与右侧内容区行对齐，且水平滚动条不被垂直滚动条推到底部不可见
+  const handleLeftScroll = useCallback(() => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (leftScrollRef.current && rightScrollRef.current) {
+      rightScrollRef.current.scrollTop = leftScrollRef.current.scrollTop;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
+
+  const handleRightScroll = useCallback(() => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (rightScrollRef.current && leftScrollRef.current) {
+      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
+
   // 系统角色 + 项目角色双层判定：两者都满足才显示管理类按钮，避免"看得见却 403"。
   // is_manager 由 GET /projects/{id} 返回（admin / owner / 经理成员）。
   const isManager = useMemo(
@@ -296,8 +317,8 @@ export default function Projects() {
     [currentProject?.is_manager],
   );
 
-  // 展开层级下拉的受控值:'collapsed'|'all'|数字字符串|'custom'
-  const [expandSel, setExpandSel] = useState<string>('all');
+  // 展开层级下拉的受控值:'collapsed'|'all'|数字字符串|'custom'（默认与 expanded 空集一致 = 全部折叠）
+  const [expandSel, setExpandSel] = useState<string>('collapsed');
 
   const toggle = (tid: string) => {
     const next = new Set(expanded);
@@ -392,7 +413,7 @@ export default function Projects() {
           assignee_name: t.assignee_name,
           planned_start: t.planned_start ?? null, planned_end: t.planned_end ?? null,
           duration_days: null, is_critical: false,
-          is_overdue: isOverdue(t), sort_order: t.sort_order, depth,
+          is_overdue: isOverdue(t), link_count: t.link_count, sort_order: t.sort_order, depth,
         };
         flat.push(gt);
         if (!cm[parentId ?? '__root__']) cm[parentId ?? '__root__'] = [];
@@ -581,70 +602,69 @@ export default function Projects() {
         {tab === 'summary' && (
           <div className="h-full flex flex-col">
             <div className="flex items-center gap-2 mb-4 shrink-0">
-              <input
+              <Input
                 type="text"
                 placeholder="搜索编号/名称..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 min-w-0"
               />
-              <select
+              <Select
+                className="!w-auto"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">全部状态</option>
                 {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </Select>
               <div className="flex-1" />
               {can('project:create') && (
-                <button onClick={handleOpenCreate}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">
+                <Button onClick={handleOpenCreate}>
                   + 新建项目
-                </button>
+                </Button>
               )}
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">编号</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">名称</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">负责人</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">状态</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">计划起止</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">成员</th>
-                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 select-none whitespace-nowrap">操作</th>
+                    <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">编号</SortableTh>
+                    <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">名称</SortableTh>
+                    <SortableTh sortKey="owner_name" active={sortField === 'owner_name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">负责人</SortableTh>
+                    <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">状态</SortableTh>
+                    <SortableTh className="text-left">计划起止</SortableTh>
+                    <SortableTh sortKey="member_count" active={sortField === 'member_count'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">成员</SortableTh>
+                    <SortableTh align="right">操作</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td>
                     </tr>
-                  ) : filtered.length === 0 ? (
+                  ) : sortedProjects.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无项目</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无项目</td>
                     </tr>
                   ) : (
-                    filtered.map((p) => (
+                    sortedProjects.map((p) => (
                       <tr key={p.id} onClick={() => handleSelectProject(p.id)}
-                          className="hover:bg-gray-50 cursor-pointer">
+                          className="hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                         <td className="px-4 py-2 text-sm font-medium">{p.code}</td>
                         <td className="px-4 py-2 text-sm">{p.name}</td>
-                        <td className="px-4 py-2 text-sm text-gray-600">{p.owner_name}</td>
+                        <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{p.owner_name}</td>
                         <td className="px-4 py-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${STATUS_CLASS[p.status]}`}>{p.status}</span>
+                          <Badge status={p.status} domain="project" />
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-500">{p.planned_start || '—'} ~ {p.planned_end || '—'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-500">{p.member_count ?? 0}</td>
+                        <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{p.planned_start || '—'} ~ {p.planned_end || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{p.member_count ?? 0}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           {can('project:update') && (
-                            <button onClick={(e) => handleOpenEdit(p, e)} className="text-primary-600 hover:text-primary-800 text-sm mr-3">编辑</button>
+                            <Button variant="link" size="xs" className="mr-3" onClick={(e) => handleOpenEdit(p, e)}>编辑</Button>
                           )}
                           {can('project:delete') && (
-                            <button onClick={(e) => handleDeleteClick(p, e)} className="text-red-600 hover:text-red-800 text-sm">删除</button>
+                            <Button variant="danger" size="xs" onClick={(e) => handleDeleteClick(p, e)}>删除</Button>
                           )}
                         </td>
                       </tr>
@@ -659,45 +679,41 @@ export default function Projects() {
         {tab === 'detail' && (
           <div className="h-full flex flex-col">
             {!currentProject || currentProject.id !== selectedProjectId ? (
-              <div className="flex-1 flex items-center justify-center text-gray-400">
+              <div className="flex-1 flex items-center justify-center text-[var(--ui-text-tertiary)]">
                 {selectedProjectId ? '加载中...' : '请从项目汇总中选择一个项目'}
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3 mb-4 shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-3 mb-4 shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg px-4 py-2">
                   <span className="font-semibold">{currentProject.code} · {currentProject.name}</span>
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${STATUS_CLASS[currentProject.status]}`}>{currentProject.status}</span>
-                  <span className="text-sm text-gray-500">负责人 {currentProject.owner_name}</span>
+                  <Badge status={currentProject.status} domain="project" />
+                  <span className="text-sm text-[var(--ui-text-secondary)]">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
-                  <button onClick={() => setDeliverableOpen(true)}
-                          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">交付物汇总</button>
+                  <Button variant="secondary" size="md" onClick={() => setDeliverableOpen(true)}>交付物汇总</Button>
                   {isManager && (
-                    <button onClick={() => setMemberOpen(true)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">成员管理</button>
+                    <Button variant="secondary" size="md" onClick={() => setMemberOpen(true)}>成员管理</Button>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2 mb-3 shrink-0">
-                  <input
+                  <Input
                     type="text"
                     placeholder="搜索任务..."
                     value={taskSearch}
                     onChange={(e) => setTaskSearch(e.target.value)}
-                    className="w-44 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="!w-64 shrink-0"
                   />
-                  <select value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
+                  <Select className="!w-auto" value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)}>
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
-                    <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                  </Select>
+                  <Button active={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
                     只看我的任务
-                  </label>
+                  </Button>
                   {maxTreeDepth > 0 && (
-                    <select
+                    <Select size="md" className="!w-auto"
                       value={expandSel}
                       onChange={(e) => handleExpandChange(e.target.value)}
-                      className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600"
                     >
                       <option value="collapsed">全部折叠</option>
                       {Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => (
@@ -705,39 +721,41 @@ export default function Projects() {
                       ))}
                       <option value="all">全部展开</option>
                       {expandSel === 'custom' && <option value="custom">自定义</option>}
-                    </select>
+                    </Select>
                   )}
                   {viewMode === 'table' ? (
-                    <button onClick={() => setViewMode('gantt')} className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">甘特图</button>
+                    <Button variant="secondary" size="md" onClick={() => setViewMode('gantt')}>甘特图</Button>
                   ) : (
-                    <button onClick={() => setViewMode('table')} className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">计划表</button>
+                    <Button variant="secondary" size="md" onClick={() => setViewMode('table')}>计划表</Button>
                   )}
                   {viewMode === 'gantt' && (
                     <>
-                      <span className="text-sm text-gray-400">视图:</span>
+                      <span className="text-sm text-[var(--ui-text-tertiary)]">视图:</span>
                       {(['day', 'week', 'month'] as const).map((s) => (
-                        <button key={s} onClick={() => setGanttScale(s)}
-                          className={`px-2 py-1.5 text-sm rounded ${ganttScale === s ? 'bg-primary-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                        <Button key={s} size="md" active={ganttScale === s} onClick={() => setGanttScale(s)}>
                           {s === 'day' ? '日' : s === 'week' ? '周' : '月'}
-                        </button>
+                        </Button>
                       ))}
                       {can('project.task:depend') && (
-                        <button onClick={() => setAutoScheduleKey((k) => k + 1)} className="px-2 py-1.5 text-sm rounded bg-primary-600 text-white hover:bg-primary-700">刷新排期</button>
+                        <Button size="md" onClick={() => setAutoScheduleKey((k) => k + 1)}>刷新排期</Button>
                       )}
                     </>
                   )}
                   <div className="flex-1" />
                   {isManager && (
-                    <button onClick={() => openCreate(null)} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">+ 新建顶层任务</button>
+                    <Button size="md" onClick={() => openCreate(null)}>+ 新建顶层任务</Button>
                   )}
                 </div>
 
-                <div className="border border-gray-200 rounded-lg overflow-hidden flex-1 min-h-0">
-                  <div className="overflow-y-auto h-full bg-white" style={{ overflowX: 'hidden' }}
+                <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0">
+                  {/* 左右双滚动容器（参考 CAD 工作台 BOM 匹配表）：左侧固定区自带垂直滚动条，
+                      右侧内容区双向滚动且滚动条溢出时常显，左右垂直滚动互相同步 */}
+                  <div className="h-full flex bg-[var(--ui-bg-surface)]"
                        onMouseLeave={() => setHoveredId(null)}
                        onDragLeave={() => { setDragOver(null); if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; } }}>
-                    <div className="flex">
-                      <SharedLeftPanel
+                    <div className="flex h-full min-w-0 flex-1">
+                      <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden scrollbar-hidden" onScroll={handleLeftScroll}>
+                        <SharedLeftPanel
                         tasks={visibleLeftTasks}
                         expanded={expanded}
                         childMap={childMap}
@@ -753,31 +771,27 @@ export default function Projects() {
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
+                        canAddChild={isManager}
+                        canDelete={can('project.task:delete')}
+                        onAddChild={(id) => openCreate(id)}
+                        onDelete={(id) => { const t = findTaskById(tasks, id); if (t) setDelTask(t); }}
                       />
+                      </div>
                       {viewMode === 'table' ? (
-                        <div className="flex-1 bg-white">
-                           <div className="bg-gray-50 border-b border-gray-200 flex items-center text-sm font-medium text-gray-500 sticky top-0 z-10" style={{ height: 36 }}>
+                        <div ref={rightScrollRef} className="flex-1 min-w-0 bg-[var(--ui-bg-surface)] overflow-auto" onScroll={handleRightScroll}>
+                           <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex items-center text-sm font-medium text-[var(--ui-text-secondary)] sticky top-0 z-10 min-w-[520px]" style={{ height: 36 }}>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 64 }}>优先级</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划开始</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划完成</span>
-                            <span className="px-2 flex-1 min-w-0 truncate text-left">描述</span>
-                            <span className="shrink-0 px-4 text-right">关联/操作</span>
+                            <span className="px-2 flex-1 min-w-[240px] truncate text-left">描述</span>
                           </div>
                           {currentProject && (
                             <>
-                              <div className="flex items-center bg-gray-50 border-b border-gray-200 text-sm" style={{ height: 36 }}>
-                                <span className="px-2 shrink-0 truncate text-gray-400" style={{ width: 64 }}>—</span>
-                                <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{currentProject.planned_start || '—'}</span>
-                                <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{currentProject.planned_end || '—'}</span>
-                                <span className="px-2 flex-1 min-w-0 truncate text-gray-500" title={currentProject.description || undefined}>{currentProject.description || '—'}</span>
-                                <div className="shrink-0 flex items-center justify-end px-4 text-gray-400">
-                                  {isManager && (
-                                    <button onClick={() => setMemberOpen(true)} className="text-primary-600 text-sm mr-2">成员</button>
-                                  )}
-                                  {can('project:update') && (
-                                    <button onClick={(e) => handleOpenEdit(currentProject, e)} className="text-primary-600 text-sm">编辑</button>
-                                  )}
-                                </div>
+                              <div className="flex items-center bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] text-sm min-w-[520px]" style={{ height: 36 }}>
+                                <span className="px-2 shrink-0 truncate text-[var(--ui-text-tertiary)]" style={{ width: 64 }}>—</span>
+                                <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_start || '—'}</span>
+                                <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_end || '—'}</span>
+                                <span className="px-2 flex-1 min-w-[240px] truncate text-[var(--ui-text-secondary)]" title={currentProject.description || undefined}>{currentProject.description || '—'}</span>
                               </div>
                               {(() => {
                                 const rightRows: JSX.Element[] = [];
@@ -797,29 +811,26 @@ export default function Projects() {
                                       onDrop={(e) => handleDrop(t, e)}
                                       onClick={() => openEdit(t)}
                                       onMouseEnter={() => setHoveredId(t.id)}
-                                      className={`flex items-center border-b border-gray-100 text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${overdue ? 'bg-red-50' : ''} cursor-pointer ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''}`}
+                                      className={`project-detail-row flex items-center border-b border-[var(--ui-border)] text-sm min-w-[520px] ${hoveredId === t.id ? 'bg-[var(--ui-highlight-bg)]' : overdue ? 'bg-red-50' : ''} cursor-pointer ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''}`}
                                       style={{ height: 36 }}>
                                       <span className="px-2 shrink-0 truncate" style={{ width: 64 }}>{t.priority}</span>
-                                      <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{t.planned_start || '—'}</span>
-                                      <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{t.planned_end || '—'}</span>
-                                      <span className="px-2 flex-1 min-w-0 truncate text-gray-500" title={t.description || undefined}>{t.description || '—'}</span>
-                                      <div className="shrink-0 flex items-center justify-end px-4 text-gray-400" onClick={(e) => e.stopPropagation()}>
-                                        {(t.link_count ?? 0) > 0 && <span className="mr-2">🔗 {t.link_count}</span>}
-                                        {isManager && <button onClick={() => openCreate(t.id)} className="text-primary-600 text-sm mr-2">+子</button>}
-                                        {can('project.task:delete') && <button onClick={() => setDelTask(t)} className="text-red-600 text-sm">删除</button>}
-                                      </div>
+                                      <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_start || '—'}</span>
+                                      <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_end || '—'}</span>
+                                      <span className="px-2 flex-1 min-w-[240px] truncate text-[var(--ui-text-secondary)]" title={t.description || undefined}>{t.description || '—'}</span>
                                     </div>
                                   );
                                   if (isDragBelow) rightRows.push(<div key={t.id + '-below'} className="h-1"><div className="h-1 bg-primary-500 rounded-full mx-1" /></div>);
                                 }
-                                return <>{rightRows.length > 0 ? rightRows : tasks.length === 0 ? <div className="px-4 py-8 text-center text-gray-400">暂无任务</div> : <div className="px-4 py-8 text-center text-gray-400">无匹配任务</div>}</>;
+                                return <>{rightRows.length > 0 ? rightRows : tasks.length === 0 ? <div className="px-4 py-8 text-center text-[var(--ui-text-tertiary)]">暂无任务</div> : <div className="px-4 py-8 text-center text-[var(--ui-text-tertiary)]">无匹配任务</div>}</>;
                               })()}
                             </>
                           )}
                         </div>
                       ) : (
+                        <div ref={rightScrollRef} className="flex-1 min-w-0 bg-[var(--ui-bg-surface)] overflow-auto" onScroll={handleRightScroll}>
                         <GanttView
                           hideLeftPanel
+                          scrollRef={rightScrollRef}
                           hoveredId={hoveredId}
                           onHoverChange={setHoveredId}
                           filteredTaskIds={filteredTaskIds.size > 0 ? filteredTaskIds : null}
@@ -835,6 +846,7 @@ export default function Projects() {
                           onRowClick={(id) => { const t = findTaskById(tasks, id); if (t) openEdit(t); }}
                           onTaskUpdated={() => { loadTasks(selectedProjectId!); setGanttKey((k) => k + 1); }}
                         />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -851,22 +863,16 @@ export default function Projects() {
                                onClose={() => setEditOpen(false)}
                                onSaved={(saved) => {
                                  setEditOpen(false);
-                                 if (saved?.taskId) {
-                                   patchTask(saved.taskId, saved);
-                                   setGanttKey((k) => k + 1);
-                                 } else {
-                                   reload();
-                                   setDeliverableKey((k) => k + 1);
-                                 }
+                                 // 项目详情下显示的全部任务信息原地刷新：
+                                 // patchTask 立即本地更新（不闪屏）+ reload 全量重拉任务树（父级日期汇总/所有层级）+ 甘特图 + 交付物
+                                 if (saved?.taskId) patchTask(saved.taskId, saved);
+                                 reload();
+                                 setDeliverableKey((k) => k + 1);
                                }}
                                onRefresh={(payload) => {
-                                 if (payload?.taskId) {
-                                   patchTask(payload.taskId, payload);
-                                   setGanttKey((k) => k + 1);
-                                 } else {
-                                   reload();
-                                   setDeliverableKey((k) => k + 1);
-                                 }
+                                 // 弹窗内状态流转等：本地更新 + 全量校准（父级汇总等）
+                                 if (payload?.taskId) patchTask(payload.taskId, payload);
+                                 reload();
                                }} />
                 <ConfirmModal open={!!delTask} content={`确认删除任务"${delTask?.name}"及其所有子任务?`}
                               onConfirm={confirmDelete} onCancel={() => setDelTask(null)} />
@@ -880,63 +886,58 @@ export default function Projects() {
       <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="lg">
         <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">项目名称 <span className="text-red-500">*</span></label>
-              <input
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">项目名称 <span className="text-red-500">*</span></label>
+              <Input size="xs"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
             </div>
             {editingProject && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-                <select
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
+                <Select size="xs"
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                </Select>
               </div>
             )}
             {editingProject && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
-                <select
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">负责人</label>
+                <Select size="xs"
                   value={form.owner_id}
                   onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   {allUsers.map((u) => <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>)}
-                </select>
+                </Select>
               </div>
             )}
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
-              <input
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">计划开始</label>
+              <Input size="xs"
                 type="date"
                 value={form.planned_start}
                 onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">计划完成</label>
-              <input
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">计划完成</label>
+              <Input size="xs"
                 type="date"
                 value={form.planned_end}
                 onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">描述</label>
-              <textarea
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</label>
+              <Textarea size="xs"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                className="resize-none"
                 rows={3}
                 placeholder="可选"
               />
@@ -944,10 +945,10 @@ export default function Projects() {
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-          <button onClick={() => { setCreateOpen(false); setEditingProject(null); }} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-          <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+          <Button variant="secondary" onClick={() => { setCreateOpen(false); setEditingProject(null); }}>取消</Button>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? '保存中...' : (editingProject ? '保存' : '创建')}
-          </button>
+          </Button>
         </div>
       </Modal>
 

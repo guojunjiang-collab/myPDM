@@ -27,10 +27,10 @@ export function useHeaderTabs<T extends string>(
               key={tab.key}
               onClick={() => enabled && onChange(tab.key)}
               disabled={!enabled}
-              className={`px-3 py-1 text-lg font-semibold rounded-md transition-colors ${
+              className={`h-[var(--ui-control-h)] inline-flex items-center px-3 text-lg font-semibold rounded-[var(--ui-control-radius)] transition-colors ${
                 active === tab.key
                   ? 'text-primary-600 bg-primary-50'
-                  : 'text-gray-800 hover:bg-gray-50'
+                  : 'text-gray-800 hover:bg-[var(--ui-bg-hover)]'
               } ${enabled ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
             >
               {tab.label}

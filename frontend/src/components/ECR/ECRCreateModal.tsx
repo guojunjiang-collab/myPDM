@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, usersApi, documentsApi, customFieldsApi } from '../../services/api';
@@ -7,17 +7,17 @@ import { useDataStore } from '../../stores/data';
 import type { ECRRequest, ECRCreateData, ECRReviewer, ECRDocumentLink, BomImpactNode } from '../../types';
 import { ECRAffectedItemPicker } from './ECRAffectedItemPicker';
 import { ECRBomImpactView } from './ECRBomImpactView';
-import { ECRDocumentPicker } from './ECRDocumentPicker';
+import DocumentPicker from '../DocumentPicker';
+import Tabs from '../ui/Tabs';
 import VersionSelectModal from '../VersionSelectModal';
-
-const statusTag = (s: string) => {
-  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  const colors: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
-  };
-  return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
-};
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
+import Textarea from '../ui/Textarea';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -118,9 +118,24 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showAffectedPicker, setShowAffectedPicker] = useState(false);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  // Tab 分页（参考零部件详情：基本信息/审批人/关联图文档/BOM影响）
+  const [activeTab, setActiveTab] = useState<'info' | 'reviewers' | 'docs' | 'items'>('info');
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
+
+  // 关联图文档表排序（值混合 link 顶层与 docData，包装扁平排序键）
+  const sortableDocLinks = useMemo(() => documentLinks.map((link: any) => {
+    const doc = docData[link.document_id];
+    return {
+      ...link,
+      _code: doc?.code || link.document_code || '',
+      _name: doc?.name || link.document_name || '',
+      _version: doc?.version || link.document_version || '',
+      _status: doc?.status || '',
+    };
+  }), [documentLinks, docData]);
+  const { sortedData: sortedDocLinks, sortField: docSortField, sortDirection: docSortDirection, handleSort: handleDocSort } = useTableSort<any>(sortableDocLinks, { fieldComparators: { _version: (a, b) => compareVersions(String(a), String(b)) } });
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
   const descRef = useRef<HTMLTextAreaElement>(null);
@@ -162,7 +177,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
       if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
     }, 0);
     return () => clearTimeout(timer);
-  }, [open, description]);
+  }, [open, description, activeTab]);
 
   // Initialize form on open or when editingEcr changes
   useEffect(() => {
@@ -189,6 +204,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         resetForm();
       }
       setErrors({});
+      setActiveTab('info');
     }
   }, [open, editingEcr]);
 
@@ -441,83 +457,111 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
 
   return (
     <>
-    <Modal open={open} title={isEditing ? '编辑 ECR' : '新建 ECR'} onClose={handleClose} width="full">
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">ECR 编号</label>
-            <input type="text" value={editingEcr?.ecr_number || ''} disabled
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-400" placeholder="新建时自动生成" />
+    <Modal open={open} title={isEditing ? '编辑 ECR' : '新建 ECR'} onClose={handleClose} width="full" height="75vh"
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleClose}>取消</Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? '提交中...' : isEditing ? '保存修改' : '创建 ECR'}
+          </Button>
+        </>
+      }
+    >
+      <div className="h-full flex flex-col min-h-0">
+        {/* 常驻摘要条：编号 + 标题（必填） */}
+        <div className="grid grid-cols-2 gap-4 shrink-0 mb-3">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECR 编号</label>
+            <Input size="xs" type="text" value={editingEcr?.ecr_number || ''} disabled
+              placeholder="新建时自动生成" />
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">ECR 标题 <span className="text-red-500">*</span></label>
-            <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors({ ...errors, title: '' }); }}
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECR 标题 <span className="text-red-500">*</span></label>
+            <Input size="xs" type="text" value={title} onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors({ ...errors, title: '' }); }}
               placeholder="请输入 ECR 标题"
-              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.title ? 'border-red-400' : 'border-gray-200'}`} />
+              className={errors.title ? '!border-red-400' : ''} />
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
         </div>
+
+        {/* Tab 栏（必填缺失红点提示） */}
+        <div className="shrink-0 mb-3">
+          <Tabs
+            items={[
+              { key: 'info', label: <span>基本信息{!title.trim() && <span className="ml-1 text-red-500">●</span>}</span> },
+              { key: 'items', label: '受影响物料' },
+              { key: 'docs', label: '关联图文档' },
+              { key: 'reviewers', label: <span>审批{reviewers.some(r => !r.user_id) && <span className="ml-1 text-red-500">●</span>}</span> },
+            ]}
+            activeKey={activeTab}
+            onChange={(k) => setActiveTab(k as any)}
+          />
+        </div>
+
+        {/* Tab 内容区 */}
+        <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
+          {activeTab === 'info' && (
+            <>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">变更原因</label>
-            <select value={reason} onChange={(e) => setReason(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更原因</label>
+            <Select size="xs" value={reason} onChange={(e) => setReason(e.target.value)}>
               {REASON_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-            </select>
+            </Select>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">变更类别</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更类别</label>
+            <Select size="xs" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORY_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-            </select>
+            </Select>
           </div>
-          <div className="col-span-2 md:col-span-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
+          <div className="col-span-2 md:col-span-1 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
             <div className="flex gap-2 pt-0.5 flex-wrap">
               {PRIORITY_OPTIONS.map((opt) => (
                 <label key={opt.value} className="inline-flex items-center gap-0.5 cursor-pointer select-none text-xs">
                   <input type="radio" name="priority" value={opt.value} checked={priority === opt.value}
                     onChange={() => setPriority(opt.value)} className="w-3 h-3 text-primary-600" />
-                  <span className="text-gray-600">{opt.label}</span>
+                  <span className="text-[var(--ui-text-secondary)]">{opt.label}</span>
                 </label>
               ))}
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
-            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
+            <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}>
               <option value="all">会签</option>
               <option value="any">或签</option>
-            </select>
+            </Select>
           </div>
         </div>
-        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-          <label className="block text-xs text-gray-500 mb-0.5">变更描述</label>
-          <textarea ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
+        <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+          <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更描述</label>
+          <Textarea size="xs" ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
             rows={1} placeholder="请描述变更内容和原因"
-            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+            className="resize-none" />
         </div>
-
+            </>
+          )}
+          {activeTab === 'reviewers' && (
+            <>
         {/* Reviewers */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
               👤 审批人
             </label>
-            <button
+            <Button size="xs"
               type="button"
               onClick={addReviewer}
-              className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
             >
               + 添加审批人
-            </button>
+            </Button>
           </div>
 
           {reviewers.length === 0 && (
-            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
+            <div className="text-center text-[var(--ui-text-tertiary)] py-3 text-sm border border-dashed border-gray-300 rounded-lg">
               暂无审批人，请点击上方按钮添加
             </div>
           )}
@@ -526,10 +570,10 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             {reviewers.map((reviewer, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                className="flex items-center gap-3 p-3 bg-[var(--ui-bg-subtle)] rounded-lg border border-[var(--ui-border)]"
               >
-                <span className="text-xs text-gray-400 w-6">{reviewer.seq}</span>
-                <select
+                <span className="text-xs text-[var(--ui-text-tertiary)] w-6">{reviewer.seq}</span>
+                <Select
                   value={reviewer.user_id}
                   onChange={(e) => {
                     updateReviewer(index, 'user_id', e.target.value);
@@ -539,9 +583,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                       setErrors(newErrors);
                     }
                   }}
-                  className={`flex-1 border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors[`reviewer_${index}`] ? 'border-red-400' : 'border-gray-300'
-                  }`}
+                  className={`flex-1 ${errors[`reviewer_${index}`] ? '!border-red-400' : ''}`}
                   disabled={usersLoading}
                 >
                   <option value="">
@@ -552,24 +594,23 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                       {u.real_name} ({u.username}) - {u.role}
                     </option>
                   ))}
-                </select>
-                <input
+                </Select>
+                <Input size="xs"
                   type="number"
                   value={reviewer.seq}
                   onChange={(e) =>
                     updateReviewer(index, 'seq', parseInt(e.target.value) || 1)
                   }
-                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="!w-16 text-center"
                   min={1}
                 />
-                <button
+                <Button variant="danger" size="xs"
                   type="button"
                   onClick={() => removeReviewer(index)}
-                  className="text-red-400 hover:text-red-600 text-sm px-2"
                   title="移除"
                 >
                   ✕
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -578,43 +619,43 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             <p className="text-red-500 text-xs mt-1">请为所有审批人选择用户</p>
           )}
         </div>
-
+            </>
+          )}
+          {activeTab === 'docs' && (
+            <>
         {/* 关联图文档 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
-            <button type="button" onClick={() => setShowDocPicker(true)}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联图文档</h4>
+            <Button size="sm" type="button" onClick={() => setShowDocPicker(true)}>+ 关联图文档</Button>
           </div>
           <div className="border rounded-lg overflow-hidden">
             {documentLinks.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">暂无关联图文档</div>
+              <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无关联图文档</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b"><tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                  {docFieldDefs.map((def) => (<th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>))}
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                  <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
+                <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
+                  <SortableTh sortKey="_code" active={docSortField === '_code'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档编号</SortableTh>
+                  <SortableTh sortKey="_name" active={docSortField === '_name'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档名称</SortableTh>
+                  <SortableTh sortKey="_version" active={docSortField === '_version'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">版本</SortableTh>
+                  <SortableTh sortKey="_status" active={docSortField === '_status'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">状态</SortableTh>
+                  {docFieldDefs.map((def) => (<th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>))}
+                  <SortableTh className="text-left">附件</SortableTh>
+                  <SortableTh className="text-center whitespace-nowrap w-28">操作</SortableTh>
                 </tr></thead>
-                <tbody className="divide-y">{documentLinks.map((link) => {
+                <tbody className="divide-y">{sortedDocLinks.map((link) => {
                   const doc = docData[link.document_id]; const atts = docAttachments[link.document_id] || [];
-                  return (<tr key={link.document_id} className="hover:bg-gray-50">
+                  return (<tr key={link.document_id} className="hover:bg-[var(--ui-bg-hover)]">
                     <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
                     <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
-                    <td className="px-3 py-2">{doc ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span> : '-'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.version || link.document_version || '-'}</td>
+                    <td className="px-3 py-2">{doc ? <Badge status={doc.status} /> : '-'}</td>
                     {docFieldDefs.map((def) => { const vals = docCustomValues[link.document_id] || {}; const val = vals[def.id];
-                      return (<td key={def.id} className="px-3 py-2 text-sm text-gray-500">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>); })}
-                    <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
+                      return (<td key={def.id} className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>); })}
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
                     <td className="px-3 py-2 text-center"><div className="flex items-center justify-center gap-1">
-                      <button type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}
-                        className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">选择</button>
-                      <button type="button" onClick={() => removeDocumentLink(link.document_id)}
-                        className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                      <Button variant="link" size="xs" type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}>选择</Button>
+                      <Button variant="danger" size="xs" type="button" onClick={() => removeDocumentLink(link.document_id)}>移除</Button>
                     </div></td>
                   </tr>);
                 })}</tbody>
@@ -622,7 +663,10 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             )}
           </div>
         </div>
-
+            </>
+          )}
+          {activeTab === 'items' && (
+            <>
         {/* BOM 影响分析 */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -630,18 +674,17 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
               📦 BOM 影响分析
             </label>
             <div className="flex gap-2">
-              <button
+              <Button size="xs"
                 type="button"
                 onClick={() => setShowAffectedPicker(true)}
-                className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
               >
                 + 添加零部件
-              </button>
+              </Button>
             </div>
           </div>
 
           {affectedItems.length === 0 && (
-            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
+            <div className="text-center text-[var(--ui-text-tertiary)] py-3 text-sm border border-dashed border-gray-300 rounded-lg">
               暂未添加受影响物料，请点击上方按钮选择
             </div>
           )}
@@ -650,39 +693,33 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             {affectedItems.map((item, index) => (
               <div
                 key={`${item.entity_type}-${item.entity_id}`}
-                className="border border-gray-200 rounded-lg overflow-hidden"
+                className="border border-[var(--ui-border)] rounded-lg overflow-hidden"
               >
                 {/* Item header */}
-                <div className="flex items-center gap-3 p-3 bg-gray-50">
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded ${
-                      item.entity_type === 'part'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    {item.entity_type === 'part' ? '零件' : '部件'}
-                  </span>
-                  <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
-                  <span className="text-sm text-gray-600">{item.entity_name}</span>
-                  <span className="text-xs text-gray-400">{item.entity_version}</span>
+                <div className="flex items-center gap-3 p-3 bg-[var(--ui-bg-subtle)]">
+                  <Badge
+                    tone={item.entity_type === 'part' ? 'blue' : 'gray'}
+                    label={item.entity_type === 'part' ? '零件' : '部件'}
+                  />
+                  <span className="text-sm font-medium text-[var(--ui-text-primary)]">{item.entity_code}</span>
+                  <span className="text-sm text-[var(--ui-text-secondary)]">{item.entity_name}</span>
+                  <span className="text-xs text-[var(--ui-text-tertiary)]">{item.entity_version}</span>
 
                   <div className="flex-1" />
-                  <span className="text-xs text-gray-400">变更操作：升版</span>
+                  <span className="text-xs text-[var(--ui-text-tertiary)]">变更操作：升版</span>
 
-                  <button
+                  <Button variant="danger" size="xs"
                     type="button"
                     onClick={() => removeAffectedItem(index)}
-                    className="text-red-400 hover:text-red-600 text-sm px-1"
                     title="移除"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Bom impact result */}
                 {item.bom_impact && (
-                  <div className="p-3 border-t border-gray-200">
+                  <div className="p-3 border-t border-[var(--ui-border)]">
                     <ECRBomImpactView
                       upwardChain={item.bom_impact.upward_chain}
                       downwardItems={item.bom_impact.downward_items}
@@ -702,23 +739,9 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-        <button
-          onClick={handleClose}
-          className="px-4 py-2 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          取消
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? '提交中...' : isEditing ? '保存修改' : '创建 ECR'}
-        </button>
+            </>
+          )}
+        </div>
       </div>
     </Modal>
 
@@ -729,11 +752,18 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         alreadySelected={affectedItems.map((a) => a.entity_id)}
       />
 
-      <ECRDocumentPicker
+      <DocumentPicker
         open={showDocPicker}
         onClose={() => setShowDocPicker(false)}
-        onSelect={(docs) => addDocumentLinks(docs)}
-        alreadyLinked={documentLinks.map((d) => d.document_id)}
+        onConfirm={(items) =>
+          addDocumentLinks(items.map((v) => ({
+            document_id: v.document_id,
+            document_code: '',
+            document_name: '',
+            document_version: '',
+          })))
+        }
+        existingDocIds={new Set(documentLinks.map((d) => d.document_id))}
       />
       <VersionSelectModal
         open={!!versionSelectState}

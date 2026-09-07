@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../stores/notification';
+import Badge from './ui/Badge';
+import Button from './ui/Button';
 import { notificationIcon, NOTIFICATION_TARGET_ROUTE } from '../lib/notification';
 import { fromNow } from '../lib/date';
 import type { Notification } from '../types';
@@ -31,34 +33,32 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen((v) => !v)} className="relative text-gray-500 hover:text-blue-500" title="通知" aria-label="通知">
+      <button onClick={() => setOpen((v) => !v)} className="relative text-[var(--ui-text-secondary)] hover:text-blue-500" title="通知" aria-label="通知">
         <span className="text-lg">🔔</span>
         {unread > 0 && (
-          <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] rounded-full px-1 leading-4 min-w-[16px] text-center">
-            {unread > 99 ? '99+' : unread}
-          </span>
+          <Badge tone="red" label={unread > 99 ? '99+' : unread} size="xs" className="absolute -top-1.5 -right-2" />
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-[360px] bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-50">
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
+        <div className="absolute right-0 mt-2 w-[360px] bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-xl overflow-hidden z-50">
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--ui-border)]">
             <b className="text-sm">通知 {unread > 0 && <span className="text-red-500">{unread}</span>}</b>
-            <button onClick={() => markAllRead()} className="text-xs text-blue-600 hover:text-blue-800">全部已读</button>
+            <Button variant="link" size="xs" onClick={() => markAllRead()}>全部已读</Button>
           </div>
           <div className="max-h-[400px] overflow-y-auto">
             {recent.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">暂无通知</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">暂无通知</div>
             ) : recent.map((n) => {
               const ic = notificationIcon(n.event_type);
               return (
                 <div key={n.id} onClick={() => onItemClick(n)}
-                  className={`px-3 py-2.5 border-b border-gray-50 flex gap-2.5 cursor-pointer hover:bg-gray-50 ${!n.is_read ? 'bg-blue-50' : ''}`}>
+                  className={`px-3 py-2.5 border-b border-gray-50 flex gap-2.5 cursor-pointer hover:bg-[var(--ui-bg-hover)] ${!n.is_read ? 'bg-blue-50' : ''}`}>
                   <span className="rounded-md flex items-center justify-center flex-shrink-0"
                     style={{ background: ic.bg, width: 26, height: 26 }}>{ic.icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium truncate">{n.title}</div>
-                    {n.body && <div className="text-xs text-gray-500 mt-0.5 truncate">{n.body}</div>}
-                    <div className="text-xs text-gray-400 mt-0.5">{fromNow(n.created_at)}</div>
+                    {n.body && <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5 truncate">{n.body}</div>}
+                    <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">{fromNow(n.created_at)}</div>
                   </div>
                   {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />}
                 </div>
@@ -66,7 +66,7 @@ export default function NotificationBell() {
             })}
           </div>
           <div onClick={() => { setOpen(false); navigate('/notifications'); }}
-            className="text-center py-2.5 text-[13px] text-blue-600 hover:bg-gray-50 cursor-pointer border-t border-gray-100">
+            className="text-center py-2.5 text-[13px] text-blue-600 hover:bg-[var(--ui-bg-hover)] cursor-pointer border-t border-[var(--ui-border)]">
             查看全部通知 →
           </div>
         </div>

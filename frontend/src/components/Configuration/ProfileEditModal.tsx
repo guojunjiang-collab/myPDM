@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Modal } from '../Modal';
+import { Modal, ConfirmModal } from '../Modal';
 import ConfigItemPicker from './ConfigItemPicker';
 import ConfigItemDetailModal from './ConfigItemDetailModal';
 import PartDetailModal from '../PartDetailModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import Textarea from '../ui/Textarea';
+import TreeToggle from '../ui/TreeToggle';
 import { configurationApi, configurationProfileApi, usersApi, partsApi, customFieldsApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { useAuthStore, isAdmin } from '../../stores/auth';
@@ -500,11 +506,10 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   };
 
   // ── Approval flow handlers ──
-  const handleSubmitReview = async () => {
+  // 无审批人提交确认（状态驱动 ConfirmModal）
+  const [noReviewerConfirm, setNoReviewerConfirm] = useState(false);
+  const doSubmitReview = async () => {
     if (!profileId) return;
-    if (reviewers.length === 0) {
-      if (!confirm('当前无审批人，提交后将直接生效。确认提交？')) return;
-    }
     setSaving(true);
     try {
       await configurationProfileApi.submit(profileId);
@@ -512,6 +517,14 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     } catch (e: any) {
       setError(e?.response?.data?.detail || '操作失败');
     } finally { setSaving(false); }
+  };
+  const handleSubmitReview = () => {
+    if (!profileId) return;
+    if (reviewers.length === 0) {
+      setNoReviewerConfirm(true);
+      return;
+    }
+    doSubmitReview();
   };
 
   const handleWithdraw = async () => {
@@ -571,22 +584,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     setCcUsers(ccUsers.filter((c) => c.user_id !== user_id));
   };
 
-  const getStatusLabel = (s: string | undefined) => {
-    if (!s) return '-';
-    const map: Record<string, string> = { draft: '草稿', active: '生效', archived: '归档', released: '发布' };
-    return map[s] || s;
-  };
-
   const partStatusBadge = (s: string | undefined) => {
-    if (!s || s === '-') return <span className="text-gray-400">-</span>;
-    const colorMap: Record<string, string> = {
-      draft: 'bg-blue-100 text-blue-800',
-      frozen: 'bg-orange-100 text-orange-800',
-      released: 'bg-green-100 text-green-800',
-      obsolete: 'bg-red-100 text-red-800',
-    };
-    const labelMap: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-    return <span className={`px-1.5 py-0.5 rounded text-xs ${colorMap[s] || 'bg-gray-100 text-gray-800'}`}>{labelMap[s] || s}</span>;
+    if (!s || s === '-') return <span className="text-[var(--ui-text-tertiary)]">-</span>;
+    return <Badge status={s} />;
   };
 
   // ── Formal checklist: only selected items, default collapsed ──
@@ -610,24 +610,21 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     const hasSelectedParts = node.parts.some(p => p.is_selected);
 
     rows.push(
-      <tr key={node.id} className="bg-gray-50/70 cursor-pointer hover:bg-purple-50 transition-colors"
+      <tr key={node.id} className="bg-[var(--ui-bg-subtle)] cursor-pointer hover:bg-purple-50 transition-colors"
         onClick={() => handleFormalRowClick('config_item', node.id)}>
-        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <td className="px-3 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {levelPrefix}{level}
           {hasChildren ? (
-            <button type="button" onClick={(e) => { e.stopPropagation(); toggleFormalExpand(node.id); }}
-              className="inline-flex items-center text-gray-400 hover:text-gray-600 cursor-pointer select-none ml-1">
-              {isExpanded ? '\u25bc' : '\u25b6'}
-            </button>
+            <span className="ml-1 inline-flex"><TreeToggle expanded={isExpanded} onClick={() => toggleFormalExpand(node.id)} size="sm" title={isExpanded ? '折叠' : '展开'} /></span>
           ) : null}
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
-        <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.name}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
-          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
+          <Badge tone="purple" label="构型项" />
         </td>
-        <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
-        <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.version || '-'}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(node.status)}</td>
         <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
       </tr>
     );
@@ -640,16 +637,14 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         rows.push(
           <tr key={part.id} className="cursor-pointer hover:bg-blue-50 transition-colors"
             onClick={() => handleFormalRowClick(part.item_type, part.item_id)}>
-            <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level)}</td>
-            <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
-            <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
+            <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level)}</td>
+            <td className="px-3 py-2 text-sm font-mono text-[var(--ui-text-secondary)]">{part.item_code}</td>
+            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_name || '-'}</td>
             <td className="px-3 py-2 text-sm whitespace-nowrap">
-              <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                {part.item_type === 'assembly' ? '部件' : '零件'}
-              </span>
+              <Badge tone={part.item_type === 'assembly' ? 'blue' : 'gray'} label={part.item_type === 'assembly' ? '部件' : '零件'} />
             </td>
-            <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
-            <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
+            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_version || '-'}</td>
+            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(part.item_status)}</td>
             <td className="px-3 py-2 text-center text-sm">{part.quantity ?? 1}</td>
           </tr>
         );
@@ -674,26 +669,20 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
     // ── Config Item Row ──
     rows.push(
-      <tr key={node.id} className="bg-gray-50/70 hover:bg-purple-50 transition-colors">
-        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+      <tr key={node.id} className="bg-[var(--ui-bg-subtle)] hover:bg-purple-50 transition-colors">
+        <td className="px-3 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap">
           {levelPrefix}{level}
           {hasChildren ? (
-            <button
-              type="button"
-              onClick={() => toggleExpand(node.id)}
-              className="inline-flex items-center text-gray-400 hover:text-gray-600 cursor-pointer select-none ml-1"
-            >
-              {isExpanded ? '\u25bc' : '\u25b6'}
-            </button>
+            <span className="ml-1 inline-flex"><TreeToggle expanded={isExpanded} onClick={() => toggleExpand(node.id)} size="sm" title={isExpanded ? '折叠' : '展开'} /></span>
           ) : null}
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
-        <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.name}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
-          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
+          <Badge tone="purple" label="构型项" />
         </td>
-        <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
-        <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.version || '-'}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(node.status)}</td>
         <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
         <td className="px-3 py-2 text-center whitespace-nowrap">
           <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -704,9 +693,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               onChange={() => { if (!node.is_required && canEdit) handleToggleConfigNode(node.id); }}
               className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
             />
-            <span className={`text-xs px-1.5 py-0.5 rounded ${node.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-              {node.is_required ? '必选' : '可选'}
-            </span>
+            <Badge tone={node.is_required ? 'blue' : 'gray'} label={node.is_required ? '必选' : '可选'} />
           </label>
         </td>
       </tr>
@@ -717,20 +704,18 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       for (const part of node.parts) {
         if (part.item_type === 'config_item') continue;
         rows.push(
-        <tr key={part.id} className={`${!node.is_selected ? 'opacity-40' : ''} hover:bg-gray-50/50 transition-colors`}>
-          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
+        <tr key={part.id} className={`${!node.is_selected ? 'opacity-40' : ''} hover:bg-[var(--ui-bg-subtle)] transition-colors`}>
+          <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span className="inline-block w-4 mr-1" />
             {'-'.repeat(level)}
           </td>
-          <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
-          <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
+          <td className="px-3 py-2 text-sm font-mono text-[var(--ui-text-secondary)]">{part.item_code}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_name || '-'}</td>
           <td className="px-3 py-2 text-sm whitespace-nowrap">
-            <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-              {part.item_type === 'assembly' ? '部件' : '零件'}
-            </span>
+            <Badge tone={part.item_type === 'assembly' ? 'blue' : 'gray'} label={part.item_type === 'assembly' ? '部件' : '零件'} />
           </td>
-          <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
-          <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_version || '-'}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(part.item_status)}</td>
           <td className="px-3 py-2 text-center text-sm">{part.quantity ?? 1}</td>
           <td className="px-3 py-2 text-center whitespace-nowrap">
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -741,9 +726,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 onChange={() => { if (canEdit && node.is_selected) handleTogglePart(part.id, part.is_selected); }}
                 className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
               />
-              <span className={`text-xs px-1.5 py-0.5 rounded ${part.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                {part.is_required ? '必选' : '可选'}
-              </span>
+              <Badge tone={part.is_required ? 'blue' : 'gray'} label={part.is_required ? '必选' : '可选'} />
             </label>
           </td>
         </tr>
@@ -794,41 +777,37 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         width="3xl"
         headerAction={isView && profile && configTree ? (
           <div className="flex items-center gap-2">
-            <button
+            <Button variant="secondary" size="sm"
               type="button"
               onClick={() => { try { exportProfileExcel(profile, configTree); } catch (e: any) { setError(e?.message || '导出失败'); } }}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
               title="导出正式配置清单为 Excel 表格"
             >
               📊 导出表格
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary" size="sm"
               type="button"
               onClick={() => { try { exportProfilePdf(profile, configTree); } catch (e: any) { setError(e?.message || '导出失败'); } }}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
               title="导出为 PDF（正式配置清单全展开）"
             >
               📄 导出PDF
-            </button>
-            <button
+            </Button>
+            <Button size="sm"
               type="button"
               onClick={() => {
                 window.open(`/stp-viewer?config-profile=${profile.id}`, '_blank');
               }}
-              className="px-3 py-1.5 text-sm border border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700"
               title="在新标签页中3D预览配置清单中所有零部件"
             >
               🧊 3D预览
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary" size="sm"
               type="button"
               onClick={exportFlattenBom}
               disabled={flattenLoading}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 disabled:opacity-50"
               title="将该构型配置下所有构型项关联的部件BOM递归展开为叶节点零件清单并导出为Excel"
             >
               📊 导出平铺BOM
-            </button>
+            </Button>
           </div>
         ) : undefined}
       >
@@ -838,7 +817,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         )}
 
         {loading ? (
-          <div className="text-sm text-gray-400 py-8 text-center">加载中...</div>
+          <div className="text-sm text-[var(--ui-text-tertiary)] py-8 text-center">加载中...</div>
         ) : (
           <>
             {/* Basic Info */}
@@ -856,68 +835,68 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               </div>
             ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">编号 {isCreate && '*'}</label>
-                <input
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">编号 {isCreate && <span className="text-red-500">*</span>}</label>
+                <Input size="xs"
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 CFG-PROFILE-001"
                 />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">名称 {isCreate && '*'}</label>
-                <input
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 {isCreate && <span className="text-red-500">*</span>}</label>
+                <Input size="xs"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 A型机翼配置"
                 />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">架次起始</label>
-                <input
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">架次起始</label>
+                <Input size="xs"
                   value={form.effectivity_start}
                   onChange={(e) => setForm({ ...form, effectivity_start: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 001"
                 />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">架次结束</label>
-                <input
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">架次结束</label>
+                <Input size="xs"
                   value={form.effectivity_end}
                   onChange={(e) => setForm({ ...form, effectivity_end: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 999"
                 />
               </div>
-              <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">备注</label>
-                <textarea
+              <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">备注</label>
+                <Textarea size="xs"
                   ref={remarkRef}
                   value={form.remark}
                   onChange={(e) => setForm({ ...form, remark: e.target.value })}
                   rows={1}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-400"
+                  className="resize-none disabled:text-[var(--ui-text-tertiary)]"
                 />
               </div>
               {!isCreate && profile && (
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
                   <div className="flex items-center gap-2 pt-0.5">
                     <ProfileStatusBadge status={profile.status} />
                   </div>
                 </div>
               )}
               {!isView && (!isCreate ? (profile && profile.status === 'draft') : true) && (
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
                   <div className="flex gap-3 pt-0.5 text-sm">
                     <label className="flex items-center gap-1 cursor-pointer">
                       <input type="radio" checked={reviewMode === 'all'} onChange={() => setReviewMode('all')}
@@ -939,22 +918,19 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {!isCreate && !isView && profile && (
               <div className="flex items-center gap-2 border-t pt-3">
                 {profile.status === 'reviewing' && (
-                  <button onClick={handleWithdraw} disabled={saving}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
+                  <Button variant="secondary" size="sm" onClick={handleWithdraw} disabled={saving}>
                     撤回
-                  </button>
+                  </Button>
                 )}
                 {profile.status === 'rejected' && (
-                  <button onClick={handleReopen} disabled={saving}
-                    className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
+                  <Button size="sm" onClick={handleReopen} disabled={saving}>
                     重新编辑
-                  </button>
+                  </Button>
                 )}
                 {(profile.status === 'active' || profile.status === 'rejected') && isAdmin() && (
-                  <button onClick={handleArchive} disabled={saving}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
+                  <Button variant="secondary" size="sm" onClick={handleArchive} disabled={saving}>
                     归档
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -964,29 +940,27 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               <div className="space-y-3 border-t pt-3">
                 <div className="flex items-center justify-between mb-1">
                     <label className="text-sm font-medium">审批人</label>
-                    <button type="button" onClick={addReviewer}
-                      className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">
+                    <Button size="xs" type="button" onClick={addReviewer}>
                       + 添加
-                    </button>
+                    </Button>
                   </div>
                   <div className="space-y-1">
                     {reviewers.length === 0 && (
-                      <div className="text-sm text-gray-400 py-2">暂无审批人（提交时将自动生效）</div>
+                      <div className="text-sm text-[var(--ui-text-tertiary)] py-2">暂无审批人（提交时将自动生效）</div>
                     )}
                     {reviewers.map((rv, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-5">{rv.seq || i + 1}</span>
-                        <select value={rv.user_id}
+                        <span className="text-xs text-[var(--ui-text-tertiary)] w-5">{rv.seq || i + 1}</span>
+                        <Select size="xs" value={rv.user_id}
                           onChange={(e) => updateReviewer(i, e.target.value)}
                           disabled={usersLoading}
-                          className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                          className="flex-1">
                           <option value="">{usersLoading ? '加载中...' : '请选择审批人'}</option>
                           {users.filter((u) => u.id !== currentUserId && (u.role === 'admin' || u.role === 'engineer')).map((u) => (
                             <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>
                           ))}
-                        </select>
-                        <button type="button" onClick={() => removeReviewer(i)}
-                          className="text-red-400 hover:text-red-600 text-sm">✕</button>
+                        </Select>
+                        <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(i)}>✕</Button>
                       </div>
                     ))}
                   </div>
@@ -1014,27 +988,24 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {profile && canEdit && (
               <div className="border-t pt-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-gray-700">配置清单</h4>
+                  <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">配置清单</h4>
                   <div className="flex items-center gap-2">
                     {form.configuration_item_revision_id && (
                       <>
-                        <button type="button" onClick={handleRegenerate} disabled={saving}
-                          className="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 disabled:opacity-50">
+                        <Button size="xs" type="button" onClick={handleRegenerate} disabled={saving}>
                           更新
-                        </button>
-                        <button type="button" onClick={handleRemoveConfigItem} disabled={saving}
-                          className="text-xs text-red-600 hover:text-red-700 border border-red-200 px-2 py-1 rounded hover:bg-red-50 disabled:opacity-50">
+                        </Button>
+                        <Button variant="danger" size="xs" type="button" onClick={handleRemoveConfigItem} disabled={saving}>
                           删除
-                        </button>
+                        </Button>
                       </>
                     )}
-                    <button
+                    <Button size="sm"
                       type="button"
                       onClick={() => setCfgPickOpen(true)}
-                      className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
                     >
                       {form.configuration_item_revision_id ? '更换构型项' : '+ 关联构型项'}
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <ConfigItemPicker
@@ -1046,18 +1017,18 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
                 {/* Table-based checklist */}
                 {configTree ? (
-                  <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[500px] overflow-y-auto bg-white">
+                  <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden max-h-[500px] overflow-y-auto bg-[var(--ui-bg-surface)]">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-100 sticky top-0 z-10">
                         <tr>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件件号</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">状态</th>
-                          <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-12">数量</th>
-                          <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-24">可选</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-20">层级</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-44 whitespace-nowrap">构型号/零部件件号</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-28">名称</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap">类型</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">版本</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">状态</th>
+                          <th className="text-center px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-12">数量</th>
+                          <th className="text-center px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-24">可选</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -1066,8 +1037,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                     </table>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg p-4 text-center">
-                    <p className="text-xs text-gray-400">
+                  <div className="border border-[var(--ui-border)] rounded-lg p-4 text-center">
+                    <p className="text-xs text-[var(--ui-text-tertiary)]">
                       {form.configuration_item_revision_id ? '请先关联构型项以展开配置清单' : '暂无关联构型项，无法生成配置清单'}
                     </p>
                   </div>
@@ -1078,18 +1049,18 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {/* ── 正式配置清单 ── */}
             {profile && configTree && (
               <div className="border-t pt-3">
-                <h4 className="text-sm font-bold text-gray-700 mb-2">正式配置清单</h4>
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[600px] overflow-y-auto bg-white">
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">正式配置清单</h4>
+                <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden max-h-[600px] overflow-y-auto bg-[var(--ui-bg-surface)]">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件件号</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">状态</th>
-                        <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-12">数量</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-20">层级</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-44 whitespace-nowrap">构型号/零部件件号</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-28">名称</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap">类型</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">版本</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">状态</th>
+                        <th className="text-center px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-12">数量</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -1103,14 +1074,14 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {/* ── 状态日志 ── */}
             {profile && profile.status !== 'draft' && !isCreate && (profile.status_logs || []).length > 0 && (
               <div className="border-t pt-3">
-                <h4 className="text-sm font-bold text-gray-700 mb-2">状态日志</h4>
-                <ul className="text-xs text-gray-500 space-y-1 max-h-32 overflow-y-auto">
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">状态日志</h4>
+                <ul className="text-xs text-[var(--ui-text-secondary)] space-y-1 max-h-32 overflow-y-auto">
                   {(profile.status_logs || []).map((l) => (
                     <li key={l.id} className="flex gap-2">
-                      <span className="text-gray-400">{l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span>
+                      <span className="text-[var(--ui-text-tertiary)]">{l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span>
                       <span>{l.from_status || '—'} → {l.to_status}</span>
                       <span>{l.operator_name}</span>
-                      <span className="text-gray-400">{l.comment}</span>
+                      <span className="text-[var(--ui-text-tertiary)]">{l.comment}</span>
                     </li>
                   ))}
                 </ul>
@@ -1122,38 +1093,32 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       </div>
 
       {/* Footer Buttons — 置于滚动容器外侧，始终可见 */}
-      <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
-        >
+      <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-[var(--ui-border)]">
+        <Button variant="secondary" onClick={onClose}>
           关闭
-        </button>
+        </Button>
         {isCreate && (
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
           >
             {saving ? '保存中...' : '保存'}
-          </button>
+          </Button>
         )}
         {canEdit && (
           <>
-            <button
+            <Button
               onClick={handleUpdate}
               disabled={saving}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
             >
               {saving ? '保存中...' : '保存'}
-            </button>
-            <button
+            </Button>
+            <Button variant="success"
               onClick={handleSubmitReview}
               disabled={saving}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
             >
               提交
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -1175,15 +1140,26 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         onClose={() => setPartDetailMasterId(null)}
       />
     )}
+
+    {/* 无审批人提交确认 */}
+    <ConfirmModal
+      open={noReviewerConfirm}
+      title="确认提交"
+      content="当前无审批人，提交后将直接生效。确认提交？"
+      confirmText="确认提交"
+      type="warning"
+      onConfirm={() => { setNoReviewerConfirm(false); doSubmitReview(); }}
+      onCancel={() => setNoReviewerConfirm(false)}
+    />
   </>
 );
 }
 
 function InfoItem({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] ${className || ''}`}>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">{value}</div>
     </div>
   );
 }

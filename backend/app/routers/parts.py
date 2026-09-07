@@ -460,6 +460,13 @@ def delete_iteration(
                         break
             except Exception:
                 pass
+        # 同步清理该附件的 glb 缓存（含三档 LOD 与失败标记）
+        try:
+            from ..stp_converter import delete_glb_cache, is_stp_file
+            if is_stp_file(att.file_name):
+                delete_glb_cache(str(att.id), att.file_path, is_part=True)
+        except Exception:
+            pass
         db.delete(att)
 
     # 清理该迭代关联的 BOMItem 和自定义字段值
@@ -821,14 +828,16 @@ def list_attachments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("attachments:list")),
 ):
+    iteration = None
     if iteration_id:
         iteration = db.query(crud_parts.models_parts.PartIteration).filter(
             crud_parts.models_parts.PartIteration.id == iteration_id,
             crud_parts.models_parts.PartIteration.revision_id == revision_id,
         ).first()
         if not iteration:
-            raise HTTPException(404, "迭代不存在或不属于该版本")
-    else:
+            # 容错：传入的迭代与版本不匹配（如前端状态错配）时回退到当前迭代，避免整列 404
+            iteration = None
+    if iteration is None:
         result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
         if not result:
             raise HTTPException(404, "版本不存在")

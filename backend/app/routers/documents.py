@@ -383,7 +383,9 @@ async def delete_document(
                 from ..file_storage import file_storage
                 file_storage.delete_file(att.file_path)
                 if is_stp_file(att.file_name):
-                    delete_glb_cache(str(att.id))
+                    delete_glb_cache(str(att.id), att.file_path)
+                if is_office_file(att.file_name):
+                    delete_pdf_cache(str(att.id), att.file_path)
             except Exception as e:
                 print(f"[WARNING] Failed to delete file {att.file_path}: {e}")
     db.query(DocumentAttachment).filter(DocumentAttachment.revision_id == revision_id).delete()
@@ -426,7 +428,7 @@ async def upload_document_attachment(
             try:
                 file_storage.delete_file(ea.file_path)
                 if is_stp_file(ea.file_name):
-                    delete_glb_cache(str(ea.id))
+                    delete_glb_cache(str(ea.id), ea.file_path)
                 if is_office_file(ea.file_name):
                     delete_pdf_cache(str(ea.id), ea.file_path)
             except Exception:
@@ -542,7 +544,7 @@ async def delete_attachment(
             print(f"[WARNING] {e}")
 
     if is_stp_file(att.file_name):
-        delete_glb_cache(str(att.id))
+        delete_glb_cache(str(att.id), att.file_path)
     if is_office_file(att.file_name):
         delete_pdf_cache(str(att.id), att.file_path)
 

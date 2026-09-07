@@ -1,27 +1,28 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { formatDate } from '../../lib/date';
 import { useInventoryStore } from '../../stores/inventory';
 import { useAuthStore } from '../../stores/auth';
 import { inventoryApi } from '../../services/inventoryApi';
 import { canDownload } from '../../stores/auth';
+import { BADGE_DOMAINS } from '../../constants/badges';
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import Dropdown from '../ui/Dropdown';
+import SortableTh from '../ui/SortableTh';
+import { ConfirmModal } from '../Modal';
+import { toast } from '../Toast';
 import DocumentEditModal from './DocumentEditModal';
 import DocumentDetail from './DocumentDetail';
-import type { InvDocType, InvDocStatus } from '../../types';
+import type { InvDocType } from '../../types';
+import { useTableSort } from '../../hooks/useTableSort';
 
 const DOC_TYPES: { key: InvDocType; label: string }[] = [
   { key: 'inbound', label: '入库单' }, { key: 'outbound', label: '出库单' },
   { key: 'transfer', label: '调拨单' }, { key: 'stocktake', label: '盘点单' },
   { key: 'adjustment', label: '库存调整单' },
 ];
-const STATUS_LABEL: Record<InvDocStatus, string> = {
-  draft: '草稿', reviewing: '审批中', approved: '已审批', posted: '已过账',
-  rejected: '已拒绝', cancelled: '已取消',
-};
-const STATUS_COLOR: Record<InvDocStatus, string> = {
-  draft: 'bg-gray-100 text-gray-600', reviewing: 'bg-amber-100 text-amber-700',
-  approved: 'bg-primary-100 text-primary-700', posted: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400',
-};
 
 const ACT_BTN = 'text-sm';
 
@@ -37,7 +38,8 @@ export default function DocumentTab() {
   const [creating, setCreating] = useState<InvDocType | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  // 行级破坏性操作确认（状态驱动 ConfirmModal）
+  const [confirmDoc, setConfirmDoc] = useState<{ id: string; action: 'delete' | 'post' | 'cancel' } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -63,20 +65,14 @@ export default function DocumentTab() {
     });
   }, [docs, search]);
 
-  // 点击外部关闭新建菜单
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
+  // 客户端排序（全量数据）
+  const { sortedData: sortedDocs, sortField, sortDirection, handleSort } = useTableSort<any>(filteredDocs);
 
-  const selectCls = 'px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white';
+  // 点击外部关闭新建菜单 → Dropdown 内置处理
 
   const act = async (fn: () => Promise<any>) => {
     try { await fn(); await load(); }
-    catch (e: any) { alert(e?.response?.data?.detail || '操作失败'); }
+    catch (e: any) { toast.error(e?.response?.data?.detail || '操作失败'); }
   };
 
   // 行内操作列：按状态/角色显示动作；过账(盘点)与改派需在详情里填实盘/选人，故打开详情
@@ -87,8 +83,8 @@ export default function DocumentTab() {
     if (d.status === 'draft' && isCreator) {
       return (
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => act(() => inventoryApi.submit(d.id))} className="text-blue-600 hover:text-blue-800 text-sm mr-2">提交审批</button>
-          <button onClick={() => confirm('确认删除该单据？') && act(() => inventoryApi.deleteDocument(d.id))} className="text-red-600 hover:text-red-800 text-sm">删除</button>
+          <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.submit(d.id))}>提交审批</Button>
+          <Button variant="danger" size="xs" onClick={() => setConfirmDoc({ id: d.id, action: 'delete' })}>删除</Button>
         </div>
       );
     }
@@ -97,12 +93,12 @@ export default function DocumentTab() {
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
           {(isReviewer || isAdmin) && (
             <>
-              <button onClick={() => act(() => inventoryApi.review(d.id, { decision: 'approved' }))} className="text-green-600 hover:text-green-800 text-sm mr-2">通过</button>
-              <button onClick={() => act(() => inventoryApi.review(d.id, { decision: 'returned' }))} className="text-orange-600 hover:text-orange-800 text-sm mr-2">退回</button>
-              <button onClick={() => act(() => inventoryApi.review(d.id, { decision: 'rejected' }))} className="text-red-600 hover:text-red-800 text-sm mr-2">拒绝</button>
+              <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.review(d.id, { decision: 'approved' }))}>通过</Button>
+              <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.review(d.id, { decision: 'returned' }))}>退回</Button>
+              <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.review(d.id, { decision: 'rejected' }))}>拒绝</Button>
             </>
           )}
-          {isCreator && <button onClick={() => act(() => inventoryApi.withdraw(d.id))} className="text-gray-600 hover:text-gray-800 text-sm">撤回</button>}
+          {isCreator && <Button variant="link" size="xs" onClick={() => act(() => inventoryApi.withdraw(d.id))}>撤回</Button>}
         </div>
       );
     }
@@ -110,11 +106,10 @@ export default function DocumentTab() {
       return (
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
           {isKeeper && (
-            <button onClick={() => d.doc_type === 'stocktake' ? setDetailId(d.id) : (confirm('确认过账？') && act(() => inventoryApi.post(d.id, {})))}
-              className="text-green-600 hover:text-green-800 text-sm mr-2">过账</button>
+            <Button variant="link" size="xs" className="mr-2" onClick={() => d.doc_type === 'stocktake' ? setDetailId(d.id) : setConfirmDoc({ id: d.id, action: 'post' })}>过账</Button>
           )}
-          <button onClick={() => setDetailId(d.id)} className="text-primary-600 hover:text-primary-800 text-sm mr-2">改派</button>
-          <button onClick={() => confirm('确认取消该单据？') && act(() => inventoryApi.cancel(d.id))} className="text-red-600 hover:text-red-800 text-sm">取消</button>
+          <Button variant="link" size="xs" className="mr-2" onClick={() => setDetailId(d.id)}>改派</Button>
+          <Button variant="link" size="xs" onClick={() => setConfirmDoc({ id: d.id, action: 'cancel' })}>取消</Button>
         </div>
       );
     }
@@ -125,62 +120,60 @@ export default function DocumentTab() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
       <div className="flex gap-2 mb-4 items-center shrink-0">
-        <input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
+        <Input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-80 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selectCls}>
+          className="!w-64" />
+        <Select className="!w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="">全部类型</option>
           {DOC_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-        </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectCls}>
+        </Select>
+        <Select className="!w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">全部状态</option>
-          {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+          {Object.entries(BADGE_DOMAINS.inventoryDoc).map(([k, def]) => <option key={k} value={k}>{def.label}</option>)}
+        </Select>
         <div className="flex-1" />
         {canDownload() && (
-          <div className="relative" ref={menuRef}>
-            <button onClick={() => setShowMenu(!showMenu)}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建单据 ▾</button>
-            {showMenu && (
-              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                {DOC_TYPES.map((t) => (
-                  <button key={t.key} onClick={() => { setCreating(t.key); setShowMenu(false); }}
-                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 whitespace-nowrap">{t.label}</button>
-                ))}
-              </div>
-            )}
-          </div>
+          <Dropdown
+            open={showMenu}
+            onOpenChange={setShowMenu}
+            align="right"
+            trigger={<Button onClick={() => setShowMenu(!showMenu)}>+ 新建单据 ▾</Button>}
+          >
+            {DOC_TYPES.map((t) => (
+              <Button key={t.key} variant="ghost" size="sm" className="w-full !justify-start rounded-none"
+                onClick={() => { setCreating(t.key); setShowMenu(false); }}>{t.label}</Button>
+            ))}
+          </Dropdown>
         )}
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">单据号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">类型</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">库管员</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建人</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+              <SortableTh sortKey="doc_number" active={sortField === 'doc_number'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">单据号</SortableTh>
+              <SortableTh sortKey="doc_type" active={sortField === 'doc_type'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">类型</SortableTh>
+              <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">状态</SortableTh>
+              <SortableTh sortKey="keeper_name" active={sortField === 'keeper_name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">库管员</SortableTh>
+              <SortableTh sortKey="creator_name" active={sortField === 'creator_name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">创建人</SortableTh>
+              <SortableTh sortKey="created_at" active={sortField === 'created_at'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-center">创建时间</SortableTh>
+              <SortableTh align="right">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : docs.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : filteredDocs.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
-            ) : filteredDocs.map((d) => (
-              <tr key={d.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(d.id)}>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
+            ) : sortedDocs.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
+            ) : sortedDocs.map((d) => (
+              <tr key={d.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetailId(d.id)}>
                 <td className="px-4 py-3 text-sm font-medium text-primary-600">{d.doc_number}</td>
                 <td className="px-4 py-3 text-sm font-medium">{DOC_TYPES.find((t) => t.key === d.doc_type)?.label}</td>
                 <td className="px-4 py-3 text-sm font-medium">
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLOR[d.status as InvDocStatus]}`}>
-                    {STATUS_LABEL[d.status as InvDocStatus]}</span>
+                  <Badge status={d.status} domain="inventoryDoc" />
                 </td>
                 <td className="px-4 py-3 text-sm font-medium">{d.keeper_name || '-'}</td>
                 <td className="px-4 py-3 text-sm font-medium">{d.creator_name}</td>
@@ -199,6 +192,26 @@ export default function DocumentTab() {
       {detailId && (
         <DocumentDetail docId={detailId} onClose={() => setDetailId(null)} onChanged={load} />
       )}
+
+      {/* 行级操作确认 */}
+      <ConfirmModal
+        open={!!confirmDoc}
+        title="确认操作"
+        content={
+          confirmDoc?.action === 'delete' ? '确认删除该单据？'
+          : confirmDoc?.action === 'post' ? '确认过账？'
+          : '确认取消该单据？'
+        }
+        onConfirm={() => {
+          if (!confirmDoc) return;
+          const { id, action } = confirmDoc;
+          if (action === 'delete') act(() => inventoryApi.deleteDocument(id));
+          else if (action === 'post') act(() => inventoryApi.post(id, {}));
+          else act(() => inventoryApi.cancel(id));
+          setConfirmDoc(null);
+        }}
+        onCancel={() => setConfirmDoc(null)}
+      />
     </div>
   );
 }

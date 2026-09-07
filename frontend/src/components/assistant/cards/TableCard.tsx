@@ -3,7 +3,7 @@ export default function TableCard({ payload }: Props) {
   const { title, columns, rows } = payload;
   return (
     <div className="border rounded-lg overflow-hidden my-2">
-      {title && <div className="px-3 py-2 bg-gray-50 text-sm font-medium">{title}</div>}
+      {title && <div className="px-3 py-2 bg-[var(--ui-bg-subtle)] text-sm font-medium">{title}</div>}
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead><tr className="bg-gray-100">

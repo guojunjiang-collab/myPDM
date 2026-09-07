@@ -5,6 +5,7 @@ import { formatDateTime } from '../utils/date';
 import { partsApi } from '../services/api';
 import EntityDocumentSection from './EntityDocumentSection';
 import ComponentAttachmentBucket from './ComponentAttachmentBucket';
+import Badge from './ui/Badge';
 
 interface AssemblyDetailContentProps {
   assembly: Assembly;
@@ -12,16 +13,6 @@ interface AssemblyDetailContentProps {
   customFieldValues: Record<string, unknown>;
   onSubItemClick?: (item: AssemblyPartItem) => void;
 }
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
 
 export default function AssemblyDetailContent({ assembly, customFieldDefs, customFieldValues, onSubItemClick }: AssemblyDetailContentProps) {
   const [hasSubItems, setHasSubItems] = useState<boolean | null>(null);
@@ -58,7 +49,7 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
       {/* 自定义字段 */}
       {customFieldDefs.length > 0 && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+          <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {customFieldDefs.map(def => (
               <InfoItem
@@ -87,7 +78,7 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
       {/* 子项清单 */}
       {hasSubItems && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-bold text-gray-700 mb-2">子项清单</h4>
+          <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">子项清单</h4>
           <BOMTreeTable revisionId={revId} rootMasterId={masterId} onRowClick={onSubItemClick} />
         </div>
       )}
@@ -97,19 +88,18 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
 
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">{value}</div>
     </div>
   );
 }
 
 function StatusItem({ label, status }: { label: string; status: string }) {
-  const tag = statusTag(status);
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.cls}`}>{tag.label}</span>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <Badge status={status} />
     </div>
   );
 }

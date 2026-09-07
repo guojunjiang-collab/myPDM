@@ -342,14 +342,29 @@ def create_log(db, user_id, username, action, target_type=None, target_id=None, 
     db.commit()
     return db_log
 
-def get_logs(db, skip=0, limit=100, target_type=None, target_id=None):
+def get_logs(db, skip=0, limit=100, target_type=None, target_id=None,
+             sort_field='created_at', sort_order='desc'):
     q = db.query(models.OperationLog)
     if target_type:
         q = q.filter(models.OperationLog.target_type == target_type)
     if target_id:
         q = q.filter(models.OperationLog.target_id == target_id)
+    # 服务端排序（白名单映射，防注入）
+    SORT_FIELDS = {
+        'created_at': models.OperationLog.created_at,
+        'user_name': models.OperationLog.username,
+        'action': models.OperationLog.action,
+        'target_type': models.OperationLog.target_type,
+        'ip': models.OperationLog.ip_address,
+    }
+    if sort_field not in SORT_FIELDS:
+        raise ValueError(f"Invalid sort_field: {sort_field}")
+    if sort_order not in ('asc', 'desc'):
+        raise ValueError(f"Invalid sort_order: {sort_order}")
+    col = SORT_FIELDS[sort_field]
+    order = col.asc().nullslast() if sort_order == 'asc' else col.desc().nullslast()
     total = q.count()
-    items = q.order_by(models.OperationLog.created_at.desc()).offset(skip).limit(limit).all()
+    items = q.order_by(order).offset(skip).limit(limit).all()
     return items, total
 
 # ===== Custom Field Definition CRUD =====

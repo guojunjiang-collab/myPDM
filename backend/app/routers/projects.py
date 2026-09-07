@@ -502,34 +502,52 @@ _ENTITY_TABLE = {"part": "part_masters", "assembly": "part_masters", "component"
 
 
 def _link_dict(db, l):
-    from sqlalchemy import text
-    code = name = spec = remark = master_id = None
+    from sqlalchemy import text, or_
+    code = name = spec = remark = master_id = version = status = kind = None
+    has_stp = None
+    attachment_count = 0
     table = _ENTITY_TABLE.get(l.entity_type)
     if table == "part_masters":
         row = db.execute(
-            text("SELECT pm.code, pm.name, NULL AS spec, pm.id as master_id FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
+            text("SELECT pm.code, pm.name, NULL AS spec, pm.id as master_id, pr.version, pr.status, pm.type FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
             {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name, spec, master_id = row[0], row[1], row[2], row[3]
+            code, name, spec, master_id, version, status, kind = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+        # 生产附件是否含 STP/STEP（零件 3D 预览可用性，与看板一致）
+        from ..models_parts import PartAttachment, PartIteration
+        has_stp = db.query(PartAttachment).join(
+            PartIteration, PartIteration.id == PartAttachment.iteration_id
+        ).filter(
+            PartIteration.revision_id == l.entity_id,
+            PartAttachment.category == "production",
+            or_(
+                PartAttachment.file_name.ilike("%.stp"),
+                PartAttachment.file_name.ilike("%.step"),
+            ),
+        ).first() is not None
     elif table == "document_revisions":
         row = db.execute(
-            text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
+            text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id, dr.version, dr.status FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
             {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name, spec, remark, master_id = row[0], row[1], row[2], row[3], row[4]
+            code, name, spec, remark, master_id, version, status = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+        from ..models import DocumentAttachment
+        attachment_count = db.query(DocumentAttachment).filter(
+            DocumentAttachment.revision_id == l.entity_id
+        ).count()
     elif table == "configuration_item_masters":
-        # 关联存的是版本(revision)id，需 JOIN 版本表取主数据 code/name（主表仅 code/name，无 spec/remark 列）
+        # 关联存的是版本(revision)id，需 JOIN 版本表取主数据 code/name + 版本/状态（与零部件/图文档排版一致）
         row = db.execute(
-            text("SELECT cim.code, cim.name, cim.id AS master_id "
+            text("SELECT cim.code, cim.name, cim.id AS master_id, cir.version, cir.status "
                  "FROM configuration_item_masters cim "
                  "JOIN configuration_item_revisions cir ON cir.master_id = cim.id "
                  "WHERE cir.id = :id"),
             {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name, master_id = row[0], row[1], row[2]
+            code, name, master_id, version, status = row[0], row[1], row[2], row[3], row[4]
     elif table:
         row = db.execute(
             text(f"SELECT code, name FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
@@ -545,7 +563,9 @@ def _link_dict(db, l):
             code, name, remark = row[0], row[1], row[2] if len(row) > 2 else None
     return {"id": str(l.id), "task_id": str(l.task_id), "entity_type": l.entity_type,
             "entity_id": str(l.entity_id), "entity_code": code, "entity_name": name,
-            "entity_spec": spec, "entity_remark": remark, "entity_master_id": str(master_id) if master_id else None}
+            "entity_spec": spec, "entity_remark": remark, "entity_master_id": str(master_id) if master_id else None,
+            "entity_version": version, "entity_status": status, "entity_kind": kind,
+            "has_stp": has_stp, "attachment_count": attachment_count}
 
 
 def _comment_dict(db, c):

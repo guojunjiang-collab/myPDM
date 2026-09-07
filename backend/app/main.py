@@ -515,6 +515,13 @@ async def startup_event():
             migrate_licenses(db, engine)
             print("✓ licenses 表检查完成")
 
+            try:
+                from app.migrations_parts import migrate_component_type_by_children
+                migrate_component_type_by_children(db, engine)
+            except Exception as _pe:
+                db.rollback()
+                print(f"⚠ Part type self-heal migration skipped: {_pe}")
+
             def _col_default_sql(col):
                 sd = getattr(col, "server_default", None)
                 if sd is not None and getattr(sd, "arg", None) is not None:

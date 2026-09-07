@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal } from './Modal';
+import { toast } from './Toast';
 import { customFieldsApi, partsApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { isAdmin } from '../stores/auth';
@@ -8,6 +9,12 @@ import AssemblyPartPicker from './AssemblyPartPicker';
 import VersionSelectModal from './VersionSelectModal';
 import type { CustomFieldDefinition, AssemblyPartItem } from '../types';
 import CustomFieldInput from './CustomFieldInput';
+import Badge from './ui/Badge';
+import Button from './ui/Button';
+import Input from './ui/Input';
+import Select from './ui/Select';
+import Textarea from './ui/Textarea';
+import TreeToggle from './ui/TreeToggle';
 
 interface EntityEditModalProps {
   open: boolean;
@@ -149,7 +156,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       setPickerOpen(false);
       setPickerTargetId(null);
     } catch {
-      alert('添加子项失败');
+      toast.error('添加子项失败');
     }
   };
 
@@ -158,7 +165,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       await partsApi.deleteBOMItem(entityId, itemId);
       await loadEditParts(entityId);
     } catch {
-      alert('删除子项失败');
+      toast.error('删除子项失败');
     }
   };
 
@@ -171,7 +178,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       await partsApi.addBOMItem(entityId, { child_revision_id: selectedVersionId, quantity: item.quantity }, iterationId);
       await loadEditParts(entityId);
     } catch {
-      alert('切换版本失败');
+      toast.error('切换版本失败');
     } finally {
       setVersionSelectState(null);
     }
@@ -181,7 +188,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     try {
       await partsApi.updateBOMItem(entityId, itemId, { quantity: qty });
     } catch {
-      alert('更新用量失败');
+      toast.error('更新用量失败');
     }
   };
 
@@ -253,61 +260,49 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
 
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50">
-          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+        <tr key={idx} className="hover:bg-[var(--ui-bg-hover)]">
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {hasChildren && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(idx, part.child_id); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {childRows ? '\u25bc' : '\u25b6'}
-              </button>
+              <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleExpand(idx, part.child_id)} size="md" title={childRows ? '折叠' : '展开'} /></span>
             )}
           </td>
           <td className="px-3 py-2">
-            <span className={`px-1.5 py-0.5 text-xs rounded ${isAssembly ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-              {isAssembly ? '部件' : '零件'}
-            </span>
+            <Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} />
           </td>
           <td className="px-3 py-2 font-medium">{part.child_detail?.code || '-'}</td>
           <td className="px-3 py-2">{part.child_detail?.name || '-'}</td>
-          <td className="px-3 py-2 text-gray-500">{part.child_detail?.spec || '-'}</td>
-          <td className="px-3 py-2 text-gray-500">{part.child_detail?.version || '-'}</td>
+          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{part.child_detail?.spec || '-'}</td>
+          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{part.child_detail?.version || '-'}</td>
           <td className="px-3 py-2">
-            <span className={`px-1.5 py-0.5 text-xs rounded ${
-              part.child_detail?.status === 'released' ? 'bg-green-100 text-green-800' :
-              part.child_detail?.status === 'draft' ? 'bg-blue-100 text-blue-800' :
-              part.child_detail?.status === 'frozen' ? 'bg-orange-100 text-orange-800' :
-              'bg-red-100 text-red-800'
-            }`}>
-              {part.child_detail?.status === 'released' ? '发布' : part.child_detail?.status === 'draft' ? '草稿' : part.child_detail?.status === 'frozen' ? '冻结' : '作废'}
-            </span>
+            <Badge status={part.child_detail?.status} />
           </td>
           <td className="px-3 py-2">
             {level === 0 ? (
-              <input type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
+              <Input size="xs" type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="!w-16 text-right" />
             ) : (
-              <input type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleNestedQuantity(part.parent_id || part.id, part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
+              <Input size="xs" type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleNestedQuantity(part.parent_id || part.id, part.id, v); }} className="!w-16 text-right" />
             )}
           </td>
           <td className="px-3 py-2 text-right whitespace-nowrap">
             {locked ? <span className="text-gray-300 text-xs">—</span> : (
             <span className="inline-flex items-center gap-1">
-              <button type="button" onClick={() => setVersionSelectState({ itemId: part.id, childType: part.childType === 'assembly' ? 'assembly' : part.childType })} className="text-primary-600 hover:text-primary-800 text-xs" title="选择版本">选择</button>
+              <Button variant="link" size="xs" type="button" onClick={() => setVersionSelectState({ itemId: part.id, childType: part.childType === 'assembly' ? 'assembly' : part.childType })} title="选择版本">选择</Button>
               {isAssembly && (
-                <button type="button" onClick={() => {
+                <Button variant="link" size="xs" type="button" onClick={() => {
                   setPickerTargetId(part.child_id); setPickerOpen(true);
-                }} className="text-primary-600 hover:text-primary-800 text-xs" title="添加子项">+子项</button>
+                }} title="添加子项">+子项</Button>
               )}
-              <button type="button" onClick={() => {
+              <Button variant="danger" size="xs" type="button" onClick={() => {
                 if (level === 0) { handleRemovePart(part.id); }
                 else { handleNestedRemove(part.parent_id || entityId, part.id); }
-              }} className="text-red-500 hover:text-red-700 text-xs" title="移除子项">移除</button>
+              }} title="移除子项">移除</Button>
             </span>
             )}
           </td>
         </tr>
         {childRows && childRows.map((c: any, j: number) => renderPartRow(c, level + 1, `${idx}-${j}`))}
-        {loadingPart === idx && <tr><td colSpan={9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingPart === idx && <tr><td colSpan={9} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -320,7 +315,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     <>
     <Modal open={open} title={title} onClose={onClose} width="full">
       {loading ? (
-        <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
+        <div className="text-center py-8 text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {locked && (
@@ -329,41 +324,41 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
             </div>
           )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">件号</label>
-              <input type="text" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} disabled={!(isAdmin() && formData.version === 'A')} title={isAdmin() ? (formData.version === 'A' ? '管理员可修改件号' : '仅 A 版允许修改件号，升版后的版本不可改') : undefined} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">件号</label>
+              <Input size="xs" type="text" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} disabled={!(isAdmin() && formData.version === 'A')} title={isAdmin() ? (formData.version === 'A' ? '管理员可修改件号' : '仅 A 版允许修改件号，升版后的版本不可改') : undefined} />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">中文名称 <span className="text-red-500">*</span></label>
-              <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={locked} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" required />
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 <span className="text-red-500">*</span></label>
+              <Input size="xs" type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={locked} required />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">版本</label>
-              <input type="text" value={formData.version} disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500" />
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">版本</label>
+              <Input size="xs" type="text" value={formData.version} disabled />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-              <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} disabled={locked} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
+              <Select size="xs" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} disabled={locked}>
                 {STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-              </select>
+              </Select>
             </div>
-            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
-              <textarea ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-500" rows={1} />
+            <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">规格型号</label>
+              <Textarea size="xs" ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="resize-none" rows={1} />
             </div>
           </div>
 
           {/* 自定义字段 */}
           {customFieldDefs.length > 0 && (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
               {loadingCustomFields ? (
-                <div className="text-sm text-gray-500">加载中...</div>
+                <div className="text-sm text-[var(--ui-text-secondary)]">加载中...</div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {customFieldDefs.map(def => (
-                    <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                      <label className="block text-xs text-gray-500 mb-0.5">
+                    <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                      <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">
                         {def.name}
                         {def.is_required && <span className="text-red-500 ml-1">*</span>}
                       </label>
@@ -387,28 +382,28 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           {(entityType === 'assembly' || entityType === 'component') && (
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
-                {!locked && <button type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>}
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">子项清单</h4>
+                {!locked && <Button size="sm" type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }}>+ 添加子项</Button>}
               </div>
               <div className="border rounded-lg overflow-hidden">
                 {loadingEditParts ? (
-                  <div className="px-4 py-8 text-center text-sm text-gray-400">加载子项中...</div>
+                  <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载子项中...</div>
                 ) : editParts.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</div>
+                  <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">暂无子项</div>
                 ) : (
                   <div className="max-h-[400px] overflow-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b sticky top-0">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
-                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">层级</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">类型</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">中文名称</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">规格型号</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">用量</th>
+                          <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-32">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -426,11 +421,11 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">{locked ? '关闭' : '取消'}</button>
+            <Button variant="secondary" type="button" onClick={onClose}>{locked ? '关闭' : '取消'}</Button>
             {!locked && (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              <Button type="submit" disabled={saving}>
                 {saving ? '保存中...' : '保存'}
-              </button>
+              </Button>
             )}
           </div>
         </form>

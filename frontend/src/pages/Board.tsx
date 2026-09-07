@@ -1,11 +1,21 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { boardApi, usersApi, partsApi, documentsApi, configurationApi } from '../services/api';
+import { previewAttachment } from '../utils/attachmentPreview';
+import { boardApi, usersApi, partsApi, documentsApi, configurationApi, mediaApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
+import { toast } from '../components/Toast';
 import PartDetailModal from '../components/PartDetailModal';
 import DocumentDetailModal from '../components/DocumentDetailModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import ConfigItemDetailModal from '../components/Configuration/ConfigItemDetailModal';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import TreeToggle from '../components/ui/TreeToggle';
+import Dropdown from '../components/ui/Dropdown';
+import type { BadgeTone } from '../constants/badges';
+import ItemPicker, { typeBadge, StatusTag, type FilterTab } from '../components/ItemPicker';
 import { useAuthStore } from '../stores/auth';
 
 /* ================================================================
@@ -21,6 +31,9 @@ interface DashboardItem {
   name: string;
   version: string;
   status: string;
+  attachment_count?: number;
+  /** 生产附件是否含 STP/STEP（零件 3D 预览可用性） */
+  has_stp?: boolean;
 }
 
 interface FolderNode {
@@ -41,26 +54,11 @@ interface ShareRecord {
   created_at: string;
 }
 
-type FilterTab = 'all' | 'component' | 'document' | 'configuration';
-
 const ENTITY_LABEL: Record<string, string> = { part: '零部件', assembly: '零部件', component: '零部件', document: '图文档', configuration: '构型项' };
 const ENTITY_ICON: Record<string, string> = { part: '📦', assembly: '📦', component: '📦', document: '📄', configuration: '⚙️' };
 
 // 零件/部件已统一为「零部件」，旧数据 entity_type 可能仍为 part/assembly
 const isComponentType = (t: string) => t === 'component' || t === 'part' || t === 'assembly';
-
-const STATUS_TAG: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  active: { label: '有效', cls: 'bg-green-100 text-green-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
-
-const StatusTag = ({ status }: { status: string }) => {
-  const s = STATUS_TAG[status] || { label: status, cls: 'bg-gray-100 text-gray-800' };
-  return <span className={`px-1.5 py-0.5 text-xs rounded-full ${s.cls}`}>{s.label}</span>;
-};
 
 /* ================================================================
    Helpers
@@ -113,7 +111,6 @@ export default function Board() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [removeShareId, setRemoveShareId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ id: string; el: HTMLElement } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   /* ---- Data ---- */
   const [usersList, setUsersList] = useState<{ id: string; username: string; real_name: string }[]>([]);
@@ -126,6 +123,8 @@ export default function Board() {
   const [detailItem, setDetailItem] = useState<DashboardItem | null>(null);
   const [detailComponentId, setDetailComponentId] = useState<string | null>(null);
   const [detailDocId, setDetailDocId] = useState<string | null>(null);
+  /** 预览模式：打开详情弹窗时直达附件 Tab */
+  const [previewMode, setPreviewMode] = useState(false);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   /* ---- 侧边栏「共享给我的」区域高度（可拖动分隔条调整） ---- */
@@ -179,20 +178,11 @@ export default function Board() {
     loadDashboard();
   }, [loadDashboard]);
 
-  /* Close menu on outside click */
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAnchor(null);
-    };
-    if (menuAnchor) document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [menuAnchor]);
-
   /* Selected folder */
   const allFolders = useMemo(() => [...myFolders, ...sharedFolders], [myFolders, sharedFolders]);
   const selectedFolder = useMemo(() => selectedId ? findFolderById(allFolders, selectedId) : null, [selectedId, allFolders]);
   const selectedItems = useMemo(() => selectedFolder ? flattenItems(selectedFolder) : [], [selectedFolder]);
-  const filteredItems = useMemo(() => filterTab === 'all' ? selectedItems : selectedItems.filter((i) => filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab), [selectedItems, filterTab]);
+  const filteredItems = useMemo(() => filterTab === 'all' ? selectedItems : selectedItems.filter((i) => i.entity_type === filterTab), [selectedItems, filterTab]);
   const existingIds = useMemo(() => {
     const ids = new Set(selectedItems.map((i) => i.entity_id));
     selectedItems.forEach((i) => { if (i.master_id) ids.add(i.master_id); });
@@ -207,21 +197,30 @@ export default function Board() {
   /* ---- Actions ---- */
   const toggleExpand = (id: string) => setExpandedIds((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
+  // 弹窗提交 saving（阶段2c 补缺口）
+  const [createSaving, setCreateSaving] = useState(false);
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [sharesSaving, setSharesSaving] = useState(false);
+
   const handleCreate = async () => {
-    if (!createName.trim()) return;
+    if (!createName.trim() || createSaving) return;
+    setCreateSaving(true);
     try {
       await boardApi.createFolder({ name: createName.trim(), parent_id: createModal || undefined });
       setCreateModal(null); setCreateName('');
       await loadDashboard();
-    } catch (e: any) { alert(e?.response?.data?.detail || '创建失败'); }
+    } catch (e: any) { toast.error(e?.response?.data?.detail || '创建失败'); }
+    finally { setCreateSaving(false); }
   };
 
   const handleRename = async () => {
-    if (!renameModal || !renameName.trim()) return;
+    if (!renameModal || !renameName.trim() || renameSaving) return;
+    setRenameSaving(true);
     try {
       await boardApi.updateFolder(renameModal.id, { name: renameName.trim() });
       setRenameModal(null); await loadDashboard();
-    } catch { alert('重命名失败'); }
+    } catch { toast.error('重命名失败'); }
+    finally { setRenameSaving(false); }
   };
 
   const handleDelete = async () => {
@@ -230,7 +229,7 @@ export default function Board() {
       await boardApi.deleteFolder(deleteId);
       if (selectedId === deleteId) setSelectedId(null);
       setDeleteId(null); await loadDashboard();
-    } catch { alert('删除失败'); }
+    } catch { toast.error('删除失败'); }
   };
 
   const handleRemoveSharedFolder = async () => {
@@ -239,17 +238,17 @@ export default function Board() {
       await boardApi.removeSharedFolder(removeShareId);
       if (selectedId === removeShareId) setSelectedId(null);
       setRemoveShareId(null); await loadDashboard();
-    } catch { alert('移除共享失败'); }
+    } catch { toast.error('移除共享失败'); }
   };
 
   const handleRemoveItem = async (itemId: string) => {
-    try { await boardApi.removeItem(itemId); await loadDashboard(); } catch { alert('移除失败'); }
+    try { await boardApi.removeItem(itemId); await loadDashboard(); } catch { toast.error('移除失败'); }
   };
 
   const handleAddItems = async (items: { entity_type: string; entity_id: string }[]) => {
     if (!selectedId) return;
     try { await boardApi.addItems(selectedId, items); setPickerOpen(false); await loadDashboard(); }
-    catch (e: any) { alert(e?.response?.data?.detail || '关联失败'); }
+    catch (e: any) { toast.error(e?.response?.data?.detail || '关联失败'); }
   };
 
   const loadShares = async (fid: string) => {
@@ -286,7 +285,8 @@ export default function Board() {
   };
 
   const handleSaveShares = async () => {
-    if (!shareModal) return;
+    if (!shareModal || sharesSaving) return;
+    setSharesSaving(true);
     try {
       await boardApi.saveShares(shareModal, workingShares.map(s => ({
         shared_with_user_id: s.shared_with_user_id,
@@ -296,7 +296,8 @@ export default function Board() {
       setShareUserId('');
       setUserSearch('');
       await loadDashboard();
-    } catch (e: any) { alert(e?.response?.data?.detail || '保存失败'); }
+    } catch (e: any) { toast.error(e?.response?.data?.detail || '保存失败'); }
+    finally { setSharesSaving(false); }
   };
 
   const handleCancelShares = () => {
@@ -310,6 +311,7 @@ export default function Board() {
   const canEditFolder = selectedFolder ? !selectedFolder.shared_from || selectedFolder.shared_from?.permission === 'edit' : false;
 
   const handleViewDetail = (item: DashboardItem) => {
+    setPreviewMode(false);
     // 图文档 → DocumentDetailModal；零部件 → 复用零部件管理的 PartDetailModal；构型项 → 复用构型项管理的 ConfigItemDetailModal
     if (item.entity_type === 'document') {
       setDetailDocId(item.entity_id);
@@ -324,10 +326,55 @@ export default function Board() {
     }
   };
 
+  /** 预览：部件 → 装配体 3D；零件 → STP 附件 3D；图文档 → 附件预览 */
+  const handlePreview = async (item: DashboardItem) => {
+    if (item.entity_type === 'assembly') {
+      // 部件：装配体 3D 预览（装配结构实例，不依赖附件）
+      window.open(`/stp-viewer?assembly=${item.entity_id}`, '_blank');
+      return;
+    }
+    if (item.entity_type === 'part') {
+      // 零件：找该 revision 的 STP/STEP 附件，打开 3D 查看器
+      try {
+        const res: any = await partsApi.listAttachments(item.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
+        const stp = atts.find((a) => /\.(stp|step)$/i.test(a.file_name || ''));
+        if (stp) {
+          const mt = await mediaApi.token(stp.id, 'gltf');
+          window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
+          return;
+        }
+      } catch { /* 忽略，走 fallback */ }
+      // 无 STP 附件：打开详情弹窗直达附件 Tab
+      setPreviewMode(true);
+      setDetailComponentId(item.master_id || item.entity_id);
+      setDetailItem(null);
+    } else if (item.entity_type === 'document') {
+      // 图文档：直接做附件预览（与附件预览一致——新窗口按格式分发）
+      try {
+        const res: any = await documentsApi.listAttachments(item.entity_id);
+        // documentsApi.listAttachments 返回 axios 响应（未 .then(r => r.data)），兼容两种结构
+        const atts: any[] = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (res?.items || []));
+        const att = atts[0];
+        if (att) {
+          await previewAttachment(att.id, att.file_name || '', {
+            // 压缩包无法直接预览：明确提示，不打开详情弹窗
+            onArchive: () => toast.info('压缩包附件请在图文档详情中查看'),
+          });
+          return;
+        }
+        toast.info('该图文档暂无附件可预览');
+      } catch {
+        toast.error('附件预览失败，请重试');
+      }
+    }
+  };
+
   /* Tab counts */
   const tabCounts = useMemo(() => ({
     all: selectedItems.length,
-    component: selectedItems.filter((i) => isComponentType(i.entity_type)).length,
+    part: selectedItems.filter((i) => i.entity_type === 'part').length,
+    assembly: selectedItems.filter((i) => i.entity_type === 'assembly').length,
     document: selectedItems.filter((i) => i.entity_type === 'document').length,
     configuration: selectedItems.filter((i) => i.entity_type === 'configuration').length,
   }), [selectedItems]);
@@ -336,121 +383,137 @@ export default function Board() {
    Render
    ================================================================ */
 
-  if (loading) return <div className="text-gray-500 py-8 text-center">加载中...</div>;
+  if (loading) return <div className="text-[var(--ui-text-secondary)] py-8 text-center">加载中...</div>;
 
   return (
-    <div className="flex h-full">
-      {/* Left: Folder Tree */}
-      <div ref={sidebarRef} className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
-        <div className="px-2 pt-2 pb-1">
-          <button type="button" onClick={() => { setCreateModal(''); setCreateName(''); }} className="w-full px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
+    <div className="flex h-full gap-4 p-4 bg-[var(--ui-bg-page)]">
+      {/* Left: 文件夹树（子卡片直接落在页面底） */}
+      <div ref={sidebarRef} className="w-72 shrink-0 flex flex-col">
+        <div className="pb-3">
+          <Button type="button" size="md" className="w-full" onClick={() => { setCreateModal(''); setCreateName(''); }}>
             + 新建文件夹
-          </button>
+          </Button>
         </div>
-        <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">我的文件夹</div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
-          {myFolders.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">暂无文件夹</p>
-          ) : (
+        <div className="flex-1 min-h-0 flex flex-col gap-2.5">
+          {/* 子卡① 我的文件夹 */}
+          <div className="flex-1 min-h-0 flex flex-col bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm overflow-y-auto">
+            <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">我的文件夹</div>
             <div className="space-y-0.5">
-              {myFolders.map((f) => (
-                <BoardTreeNode key={f.id} node={f} depth={0} isShared={false} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
-              ))}
+              {myFolders.length === 0 ? (
+                <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-6">暂无文件夹</p>
+              ) : (
+                myFolders.map((f) => (
+                  <BoardTreeNode key={f.id} node={f} depth={0} isShared={false} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
+                ))
+              )}
             </div>
+          </div>
+          {sharedFolders.length > 0 && (
+            <>
+              {/* 可拖动分隔条：调整「我的文件夹 / 共享给我的」高度比例 */}
+              <div
+                onPointerDown={handleSharedResize}
+                title="拖动调整两个区域高度"
+                className="group shrink-0 h-3 cursor-row-resize flex items-center justify-center -my-0.5"
+              >
+                <div className="w-9 h-1 rounded-full bg-[var(--ui-border)] group-hover:bg-primary-500 transition-colors" />
+              </div>
+              {/* 子卡② 共享给我的 */}
+              <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm overflow-y-auto" style={{ height: sharedPaneH }}>
+                <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">📂 共享给我的</div>
+                <div className="space-y-0.5">
+                  {sharedFolders.map((f) => (
+                    <BoardTreeNode key={`s-${f.id}`} node={f} depth={0} isShared={true} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
-        {sharedFolders.length > 0 && (
-          <>
-            {/* 可拖动分隔条：调整「共享给我的」区域高度 */}
-            <div
-              onPointerDown={handleSharedResize}
-              title="拖动调整高度"
-              className="group shrink-0 h-px cursor-row-resize bg-gray-200 hover:bg-primary-400 active:bg-primary-500 transition-colors relative"
-            >
-              {/* 视觉 1px，热区上下各扩 3px 便于拖动 */}
-              <div className="absolute inset-x-0 -top-[3px] -bottom-[3px]" />
-            </div>
-            <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">📂 共享给我的</div>
-            <div className="shrink-0 overflow-y-auto px-2 pb-2" style={{ height: sharedPaneH }}>
-              <div className="space-y-0.5">
-                {sharedFolders.map((f) => (
-                  <BoardTreeNode key={`s-${f.id}`} node={f} depth={0} isShared={true} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
       </div>
 
-      {/* Right: Content */}
+      {/* Right: 内容区（子卡片直接落在页面底） */}
       <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 min-h-0 flex flex-col gap-2.5">
         {selectedFolder ? (
           <>
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-sm font-medium text-gray-500 mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
+            {/* 子卡① 头部：路径 */}
+            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-5 py-3.5">
+              <h2 className="text-sm font-medium text-[var(--ui-text-secondary)]">{getFolderPath(allFolders, selectedFolder.id)}</h2>
+            </div>
+
+            {/* 子卡② 工具栏：Tab 筛选（Button 规范）+ 操作按钮 */}
+            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-4 py-2.5 flex items-center gap-2">
+              <div className="flex gap-2">
+                {(['all', 'part', 'assembly', 'document', 'configuration'] as FilterTab[]).map((tab) => (
+                  <Button
+                    key={tab}
+                    size="md"
+                    active={filterTab === tab}
+                    onClick={() => setFilterTab(tab)}
+                  >
+                    {tab === 'all' ? `全部 (${tabCounts.all})` : `${typeBadge(tab).label} (${tabCounts[tab]})`}
+                  </Button>
+                ))}
+              </div>
               {canEditFolder && (
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }} className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700">
-                    + 子文件夹
-                  </button>
-                  <button type="button" onClick={() => setPickerOpen(true)} className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700">
-                    + 关联项目
-                  </button>
+                <div className="ml-auto flex gap-2">
+                  <Button type="button" size="md" onClick={() => setPickerOpen(true)}>
+                    + 关联对象
+                  </Button>
                 </div>
               )}
             </div>
 
-            {/* Tabs */}
-            <div className="px-6 flex gap-0 border-b border-gray-200">
-              {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
-                <button
-                  type="button"
-                  key={tab}
-                  onClick={() => setFilterTab(tab)}
-                  className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${
-                    filterTab === tab
-                      ? 'border-primary-500 text-primary-700 font-medium'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {tab === 'all' ? `全部 (${tabCounts.all})` : `${ENTITY_LABEL[tab]} (${tabCounts[tab]})`}
-                </button>
-              ))}
-            </div>
-
-            {/* Table */}
-            <div className="flex-1 overflow-auto">
+            {/* 子卡③ 内容表格 */}
+            <div className="flex-1 min-h-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm overflow-auto">
               {filteredItems.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-16">暂无关联项目</p>
+                <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-16">暂无关联项目</p>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                     <tr>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium w-28">类型</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium">编号</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium">名称</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium w-20">版本</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium w-20">状态</th>
-                      {canEditFolder && <th className="px-5 py-2.5 text-right text-gray-500 font-medium w-20">操作</th>}
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-28">类型</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium">编号</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-20">版本</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
+                      <th className="px-5 py-2.5 text-right text-[var(--ui-text-secondary)] font-medium w-44">操作</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-200">
                     {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleViewDetail(item)}>
-                        <td className="px-5 py-2.5">
-                          <span className="mr-1">{ENTITY_ICON[item.entity_type]}</span>
-                          <span className="text-xs text-gray-500">{ENTITY_LABEL[item.entity_type]}</span>
-                        </td>
+                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={(e) => { const t = e.target as HTMLElement; if (t.closest('button')) return; handleViewDetail(item); }}>
+                        <td className="px-5 py-2.5"><Badge size="xs" tone={typeBadge(item.entity_type).tone} label={typeBadge(item.entity_type).label} /></td>
                         <td className="px-5 py-2.5 font-medium text-gray-800">{item.code}</td>
-                        <td className="px-5 py-2.5 text-gray-600">{item.name}</td>
-                        <td className="px-5 py-2.5 text-gray-500">{item.version || '-'}</td>
+                        <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.name}</td>
+                        <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
                         <td className="px-5 py-2.5"><StatusTag status={item.status} /></td>
-                        {canEditFolder && (
-                          <td className="px-5 py-2.5 text-right">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
-                          </td>
-                        )}
+                        <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                          {isComponentType(item.entity_type) && (
+                            <Button
+                              type="button"
+                              size="xs"
+                              className="mr-2"
+                              disabled={item.entity_type === 'assembly' ? false : !item.has_stp}
+                              title={item.entity_type === 'assembly' ? '装配体 3D 预览' : (item.has_stp ? '3D 预览' : '生产附件无 STP 文件')}
+                              onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
+                            >3D</Button>
+                          )}
+                          {item.entity_type === 'document' && (
+                            <Button
+                              type="button"
+                              size="xs"
+                              className="mr-2"
+                              disabled={!((item.attachment_count ?? 0) > 0)}
+                              title={((item.attachment_count ?? 0) > 0) ? '预览附件' : '暂无附件'}
+                              onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
+                            >预览</Button>
+                          )}
+                          {canEditFolder && (
+                            <Button type="button" variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }}>移除</Button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -459,45 +522,53 @@ export default function Board() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm">
+            <div className="text-center text-[var(--ui-text-tertiary)]">
               <div className="text-4xl mb-2">📂</div>
               <p className="text-sm">选择左侧文件夹查看内容</p>
             </div>
           </div>
         )}
 
+        </div>
       </div>
 
 
-      {/* ---- Context Menu ---- */}
+      {/* ---- Context Menu（共享 Dropdown；⋮ 在 BoardTreeNode 组件树深处，用 0 尺寸锚点 span 承接定位） ---- */}
       {menuAnchor && (() => {
         const menuFolder = findFolderById(allFolders, menuAnchor.id);
         const menuIsShared = !!menuFolder?.shared_from;
+        const rect = menuAnchor.el.getBoundingClientRect();
 
         return (
-          <div ref={menuRef} className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]" style={{ left: menuAnchor.el.getBoundingClientRect().left, top: menuAnchor.el.getBoundingClientRect().bottom + 4 }}>
+          <Dropdown
+            open
+            onOpenChange={(v) => { if (!v) setMenuAnchor(null); }}
+            align="left"
+            trigger={<span className="fixed w-0 h-0" style={{ left: rect.left, top: rect.bottom }} />}
+          >
             {menuIsShared ? (
-              <button type="button" className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</button>
+              <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</Button>
             ) : (
               <>
-                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</button>
-                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setShareUserId(''); setSharePermission('view'); setMenuAnchor(null); }}>🔗 共享</button>
-                <div className="border-t border-gray-100 my-1" />
-                <button type="button" className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { setDeleteId(menuAnchor.id); setMenuAnchor(null); }}>🗑️ 删除</button>
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { setCreateModal(menuAnchor.id); setCreateName(''); setMenuAnchor(null); }}>📁 新建子文件夹</Button>
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</Button>
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setShareUserId(''); setSharePermission('view'); setMenuAnchor(null); }}>🔗 共享</Button>
+                <div className="border-t border-[var(--ui-border)] my-1" />
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setDeleteId(menuAnchor.id); setMenuAnchor(null); }}>🗑️ 删除</Button>
               </>
             )}
-          </div>
+          </Dropdown>
         );
       })()}
 
       {/* ---- Rename ---- */}
       <Modal open={!!renameModal} title="重命名文件夹" onClose={() => setRenameModal(null)} width="sm">
         <div className="space-y-4">
-          <input type="text" value={renameName} onChange={(e) => setRenameName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" autoFocus />
+          <Input type="text" value={renameName} onChange={(e) => setRenameName(e.target.value)} autoFocus />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setRenameModal(null)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={handleRename} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">确认</button>
+            <Button type="button" variant="secondary" onClick={() => setRenameModal(null)} disabled={renameSaving}>取消</Button>
+            <Button type="button" onClick={handleRename} disabled={renameSaving}>{renameSaving ? '保存中...' : '确认'}</Button>
           </div>
         </div>
       </Modal>
@@ -505,10 +576,10 @@ export default function Board() {
       {/* ---- Create Folder ---- */}
       <Modal open={createModal !== null && createModal !== undefined} title="新建文件夹" onClose={() => setCreateModal(null)} width="sm">
         <div className="space-y-4">
-          <input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="请输入文件夹名称" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
+          <Input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="请输入文件夹名称" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setCreateModal(null)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={handleCreate} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">创建</button>
+            <Button type="button" variant="secondary" onClick={() => setCreateModal(null)} disabled={createSaving}>取消</Button>
+            <Button type="button" onClick={handleCreate} disabled={createSaving}>{createSaving ? '创建中...' : '创建'}</Button>
           </div>
         </div>
       </Modal>
@@ -517,22 +588,22 @@ export default function Board() {
       <Modal open={!!shareModal} title={`共享文件夹${isShareDirty ? ' (未保存)' : ''}`} onClose={handleCancelShares} width="md">
         <div className="space-y-4">
           <div className="flex gap-2">
-            <input type="text" placeholder="搜索用户名/姓名..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-            <select value={sharePermission} onChange={(e) => setSharePermission(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <Input type="text" placeholder="搜索用户名/姓名..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="flex-1" />
+            <Select value={sharePermission} onChange={(e) => setSharePermission(e.target.value)}>
               <option value="view">只读查看</option>
               <option value="edit">可编辑</option>
-            </select>
+            </Select>
           </div>
-          <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg">
+          <div className="max-h-36 overflow-y-auto border border-[var(--ui-border)] rounded-lg">
             {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !workingShares.some((s) => s.shared_with_user_id === u.id)).map((u) => (
               <button
                 type="button"
                 key={u.id}
                 onClick={() => setShareUserId(u.id)}
-                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 last:border-b-0 transition-colors ${
+                className={`w-full text-left px-3 py-2 text-sm border-b border-[var(--ui-border)] last:border-b-0 transition-colors ${
                   shareUserId === u.id
                     ? 'bg-primary-50 text-primary-700 font-medium'
-                    : 'hover:bg-gray-50 text-gray-700'
+                    : 'hover:bg-[var(--ui-bg-hover)] text-gray-700'
                 }`}
               >
                 {u.real_name} ({u.username})
@@ -540,27 +611,26 @@ export default function Board() {
               </button>
             ))}
             {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !workingShares.some((s) => s.shared_with_user_id === u.id)).length === 0 && (
-              <p className="text-center text-sm text-gray-400 py-4">无匹配用户</p>
+              <p className="text-center text-sm text-[var(--ui-text-tertiary)] py-4">无匹配用户</p>
             )}
           </div>
-          {shareUserId && <div className="flex justify-end"><button type="button" onClick={handleAddShare} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">添加到列表</button></div>}
+          {shareUserId && <div className="flex justify-end"><Button type="button" size="sm" onClick={handleAddShare}>添加到列表</Button></div>}
           {workingShares.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">已共享 ({workingShares.length})</h4>
               <div className="space-y-1">
                 {workingShares.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded">
+                  <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-[var(--ui-bg-subtle)] rounded">
                     <span className="text-sm">{s.shared_with_user?.real_name || '-'}</span>
                     <div className="flex items-center gap-2">
-                      <select
+                      <Select size="xs"
                         value={s.permission}
                         onChange={(e) => handleUpdateSharePermissionLocal(s.id, e.target.value)}
-                        className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
                       >
                         <option value="view">只读</option>
                         <option value="edit">可编辑</option>
-                      </select>
-                      <button type="button" onClick={() => handleRemoveShareLocal(s.id)} className="text-xs text-red-500 hover:text-red-700">取消</button>
+                      </Select>
+                      <Button type="button" variant="danger" size="xs" onClick={() => handleRemoveShareLocal(s.id)}>取消</Button>
                     </div>
                   </div>
                 ))}
@@ -568,9 +638,9 @@ export default function Board() {
             </div>
           )}
           {/* Save / Cancel */}
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
-            <button type="button" onClick={handleCancelShares} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={handleSaveShares} disabled={!isShareDirty} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">保存</button>
+          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--ui-border)]">
+            <Button type="button" variant="secondary" onClick={handleCancelShares} disabled={sharesSaving}>取消</Button>
+            <Button type="button" onClick={handleSaveShares} disabled={!isShareDirty || sharesSaving}>{sharesSaving ? '保存中...' : '保存'}</Button>
           </div>
         </div>
       </Modal>
@@ -583,6 +653,7 @@ export default function Board() {
         masterId={detailComponentId || ''}
         open={!!detailComponentId}
         onClose={() => setDetailComponentId(null)}
+        initialTab={previewMode ? 'attachments' : undefined}
       />
 
       {detailDocId && (
@@ -645,35 +716,31 @@ function BoardTreeNode({
         className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer group text-sm transition-colors ${
           isSelected
             ? 'bg-primary-50 text-primary-700'
-            : 'hover:bg-gray-100 text-gray-700'
+            : 'hover:bg-[var(--ui-bg-hover)] text-gray-700'
         }`}
-        style={{ paddingLeft: depth * 16 + 8 }}
+        style={{ paddingLeft: `calc(8px + ${depth} * var(--ui-tree-indent))` }}
         onClick={() => onSelect(node.id)}
       >
         {hasChildren ? (
-          <button type="button" onClick={(e) => { e.stopPropagation(); onToggle(node.id); }} className="w-3.5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs">
-            {isExpanded ? '▼' : '▶'}
-          </button>
+          <TreeToggle expanded={isExpanded} onClick={() => onToggle(node.id)} size="sm" />
         ) : (
-          <span className="w-3.5" />
+          <TreeToggle leaf size="sm" />
         )}
-        <span className="text-gray-400">{isShared ? '📂' : '📁'}</span>
+        <span className="text-[var(--ui-text-tertiary)]">{isShared ? '📂' : '📁'}</span>
         <span className="flex-1 truncate">{node.name}</span>
         {/* 共享状态标识：仅根级自己的文件夹显示 */}
         {depth === 0 && !isShared && node.is_shared && (
           <span className="text-xs text-blue-500" title="已共享">🔗</span>
         )}
         {isShared && node.shared_from && (
-          <span className="text-xs text-gray-400">{node.shared_from.real_name}</span>
+          <span className="text-xs text-[var(--ui-text-tertiary)]">{node.shared_from.real_name}</span>
         )}
         {count > 0 && (
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-primary-100 text-primary-600' : 'bg-gray-200 text-gray-500'}`}>
-            {count}
-          </span>
+          <Badge size="xs" tone={isSelected ? 'blue' : 'gray'} label={count} />
         )}
         <button
           type="button"
-          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded"
+          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] rounded"
           onClick={(e) => { e.stopPropagation(); onMenu(node.id, e.currentTarget); }}
         >
           ⋮
@@ -687,148 +754,5 @@ function BoardTreeNode({
         </div>
       )}
     </>
-  );
-}
-
-/* ================================================================
-   Item Picker
-   ================================================================ */
-
-interface ItemPickerProps {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (items: { entity_type: string; entity_id: string }[]) => void;
-  existingIds: Set<string>;
-}
-
-function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) {
-  const [tab, setTab] = useState<FilterTab>('all');
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Map<string, any>>(new Map());
-
-  /* 服务器数据（弹窗打开时实时拉取，失败时回退到本地缓存） */
-  const [srcComponents, setSrcComponents] = useState<any[]>([]);
-  const [srcDocuments, setSrcDocuments] = useState<any[]>([]);
-  const [srcConfigItems, setSrcConfigItems] = useState<any[]>([]);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [dataWarning, setDataWarning] = useState<string | null>(null);
-
-  const extract = (res: any): any[] => {
-    const d = res?.data;
-    return Array.isArray(d) ? d : (d?.items || []);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setDataLoading(true);
-    setDataWarning(null);
-    (async () => {
-      const [comp, d, c] = await Promise.allSettled([
-        partsApi.list({ page_size: 10000, show_all_versions: true }),  // 零部件：所有版本
-        documentsApi.list({ page_size: 10000, show_all_versions: true }),
-        configurationApi.listItems({ page_size: 10000 }),  // 非brief模式，返回version/status
-      ]);
-      if (cancelled) return;
-      // 每类独立处理：成功用服务器数据，失败回退到本地缓存，互不影响
-      const cache = useDataStore.getState();
-      const pick = (r: PromiseSettledResult<any>, fallback: any[], label: string): any[] => {
-        if (r.status === 'fulfilled') return extract(r.value);
-        console.error(`[ItemPicker] 加载${label}失败：`, r.reason);
-        return fallback;
-      };
-      // partsApi.list 直接返回 data（{items,total}），非 axios 响应，需单独解构
-      const comps = comp.status === 'fulfilled'
-        ? (Array.isArray(comp.value) ? comp.value : (comp.value?.items || []))
-        : (console.error('[ItemPicker] 加载零部件失败：', comp.reason), cache.parts);
-      setSrcComponents(comps);
-      setSrcDocuments(pick(d, cache.documents, '图文档'));
-      setSrcConfigItems(pick(c, cache.configItems, '构型项'));
-      const failed = [comp, d, c].some((r) => r.status === 'rejected');
-      setDataWarning(failed ? '部分数据从服务器加载失败，已使用本地缓存' : null);
-      setDataLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [open]);
-
-  const candidates = useMemo(() => {
-    const kw = search.trim().toLowerCase();
-    const all: any[] = [];
-    const seen = new Set<string>();
-    // 零部件：id 取 revision_id（看板存储 revision_id，显示时按关联版本展示）；同时检查 master_id 兼容旧数据
-    if (tab === 'all' || tab === 'component') srcComponents.forEach((p: any) => { const id = p.revision_id || p.id; const mid = p.master_id || p.id; if (!existingIds.has(id) && !existingIds.has(mid) && !seen.has(id)) { seen.add(id); all.push({ t: 'component', id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); } });
-    if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { const id = d.id || d.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'document', id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); } });
-    if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { const id = c.id || c.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'configuration', id, code: c.code, name: c.name, version: c.version || '', status: c.status || '' }); } });
-    return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
-  }, [tab, search, srcComponents, srcDocuments, srcConfigItems, existingIds]);
-
-  const handleConfirm = () => {
-    onConfirm(Array.from(selected.values()).map((v) => ({ entity_type: v.t, entity_id: v.id })));
-    setSelected(new Map()); setSearch(''); setTab('all');
-  };
-
-  const selectedList = Array.from(selected.values());
-
-  return (
-    <Modal open={open} title="关联项目" onClose={onClose} width="full">
-      <div className="space-y-4 max-h-[75vh] flex flex-col">
-        {/* Already selected */}
-        <div className="border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 border-b px-4 py-2 text-sm font-medium text-gray-700">已选 ({selectedList.length})</div>
-          {selectedList.length === 0 ? (
-            <div className="px-4 py-3 text-center text-sm text-gray-400">请在下方选择</div>
-          ) : (
-            <div className="max-h-32 overflow-y-auto">
-              <table className="w-full text-sm"><tbody className="divide-y divide-gray-100">
-                {selectedList.map((item) => (
-                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-gray-500">{item.version || '-'}</td><td className="px-3 py-1.5 text-gray-500">{item.name}</td><td className="px-3 py-1.5 text-right"><button type="button" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }} className="text-red-500 text-xs">✕</button></td></tr>
-                ))}
-              </tbody></table>
-            </div>
-          )}
-        </div>
-        {/* Search + filter */}
-        <div className="flex gap-2">
-          <input type="text" placeholder="搜索编号/名称..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-          <div className="flex gap-1">{(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((t) => (
-            <button type="button" key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded-lg ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{t === 'all' ? '全部' : ENTITY_LABEL[t]}</button>
-          ))}</div>
-        </div>
-        {/* Candidates */}
-        {dataWarning && <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">{dataWarning}</p>}
-        <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="max-h-64 overflow-y-auto">
-          {dataLoading ? (
-            <p className="p-4 text-center text-sm text-gray-400">加载中...</p>
-          ) : candidates.length === 0 ? (
-            <p className="p-4 text-center text-sm text-gray-400">无匹配结果</p>
-          ) : (
-            <table className="w-full text-sm table-fixed"><thead className="bg-gray-50 border-b sticky top-0"><tr>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">类型</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-48">编号</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-              <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
-            </tr></thead><tbody className="divide-y divide-gray-100">
-              {candidates.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2"><span className="mr-1">{ENTITY_ICON[item.t]}</span><span className="text-xs text-gray-500">{ENTITY_LABEL[item.t]}</span></td>
-                  <td className="px-3 py-2 font-medium">{item.code}</td>
-                  <td className="px-3 py-2 text-gray-500">{item.version || '-'}</td>
-                  <td className="px-3 py-2">{item.name}</td>
-                  <td className="px-3 py-2"><StatusTag status={item.status} /></td>
-                  <td className="px-3 py-2 text-center whitespace-nowrap">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <button type="button" onClick={() => setSelected(new Map(selected).set(item.id, item))} className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 whitespace-nowrap">添加</button>}</td>
-                </tr>
-              ))}
-            </tbody></table>
-          )}
-        </div></div>
-        {/* Bottom */}
-        <div className="flex justify-end gap-2 pt-2 border-t">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-          <button type="button" onClick={handleConfirm} disabled={selectedList.length === 0} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">确认关联 ({selectedList.length})</button>
-        </div>
-      </div>
-    </Modal>
   );
 }

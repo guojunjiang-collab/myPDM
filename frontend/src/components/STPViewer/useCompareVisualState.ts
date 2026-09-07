@@ -20,6 +20,7 @@ export function useCompareVisualState(
   ghostCandidates: MutableRefObject<Set<string>>,
 ) {
   const compare = useViewerStore((s) => s.compare);
+  const ghostOpacity = useViewerStore((s) => s.ghostOpacity);
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
   const wireframe = useViewerStore((s) => s.wireframe);
   const isolateMode = useViewerStore((s) => s.isolateMode);
@@ -28,12 +29,14 @@ export function useCompareVisualState(
     const group = groupRef.current;
     if (!group || !compare) return;
 
-    const { displayMode, onlyDiff, ghostOpacity, selectedKey, nodeMap } = compare;
+    const { displayMode, onlyDiff, selectedKey, nodeMap } = compare;
 
     // 选中行涉及的 mesh（左右两侧一起）。
     // BOM 行 key 在 nodeMap 里，直接取两侧 meshUuids；
     // 实例行 key（形如 "<nodeKey>:inst:3"）不在 nodeMap 里，
     // 改按 mesh 上回填的 userData.compareInstanceKey 反查。
+    // 多实例装配的中间实例/子项行 key 是叶子实例 key 的前缀 →
+    // 前缀匹配，选中整棵子树。
     const selected = new Set<string>();
     if (selectedKey) {
       const node = nodeMap.get(selectedKey);
@@ -42,8 +45,10 @@ export function useCompareVisualState(
         node.right?.meshUuids.forEach((u) => selected.add(u));
       } else {
         group.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh && child.userData.compareInstanceKey === selectedKey) {
-            selected.add(child.uuid);
+          const mesh = child as THREE.Mesh;
+          const k = mesh.userData.compareInstanceKey;
+          if (mesh.isMesh && typeof k === 'string' && (k === selectedKey || k.startsWith(selectedKey + ':'))) {
+            selected.add(mesh.uuid);
           }
         });
       }
@@ -100,5 +105,5 @@ export function useCompareVisualState(
       }
       std.needsUpdate = true;
     });
-  }, [groupRef, ghostCandidates, compare, hiddenParts, wireframe, isolateMode]);
+  }, [groupRef, ghostCandidates, compare, ghostOpacity, hiddenParts, wireframe, isolateMode]);
 }

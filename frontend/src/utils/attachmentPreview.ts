@@ -1,5 +1,6 @@
 // frontend/src/utils/attachmentPreview.ts
 import { mediaApi } from '../services/api';
+import { toast } from '../components/Toast';
 
 export const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
 export const TEXT_EXTS = ['txt', 'csv', 'log', 'json', 'xml'];
@@ -41,7 +42,7 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'preview');
       window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
-    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
+    } catch (e) { toast.error(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
@@ -54,7 +55,7 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'gltf');
       window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(mt)}`, '_blank');
-    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
+    } catch (e) { toast.error(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
@@ -65,7 +66,7 @@ export async function previewAttachment(
         `/office-reader?id=${attId}&token=${encodeURIComponent(mt)}&name=${encodeURIComponent(fileName)}`,
         '_blank',
       );
-    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
+    } catch (e) { toast.error(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
@@ -73,7 +74,7 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'office-pdf');
       window.open(`/api/v2/attachments/${attId}/office-pdf?token=${encodeURIComponent(mt)}`, '_blank');
-    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
+    } catch (e) { toast.error(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
@@ -81,9 +82,9 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'preview');
       window.open(`/markdown-reader?id=${attId}&token=${encodeURIComponent(mt)}&name=${encodeURIComponent(fileName)}`, '_blank');
-    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
+    } catch (e) { toast.error(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
-  alert('该格式暂不支持预览');
+  toast.info('该格式暂不支持预览');
 }

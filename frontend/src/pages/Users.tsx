@@ -1,12 +1,18 @@
-import { useEffect, useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import { useEffect, useMemo, useState } from 'react';
 import { usersApi, userGroupsApi } from '../services/api';
 import type { User } from '../types';
 import { isAdmin, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
+import { toast } from '../components/Toast';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import FormField from '../components/ui/FormField';
+import Alert from '../components/ui/Alert';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
-import { previewUsersImport, executeUsersImport } from '../services/importExport';
+import { filterUsers } from '../lib/filterUsers';
 
 interface UserFormData {
   username: string;
@@ -28,24 +34,8 @@ const initialFormData: UserFormData = {
   password: '',
 };
 
-const roleTag = (role: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    admin: { label: '管理员', cls: 'bg-red-100 text-red-800' },
-    engineer: { label: '工程师', cls: 'bg-blue-100 text-blue-800' },
-    production: { label: '生产人员', cls: 'bg-green-100 text-green-800' },
-    guest: { label: '访客', cls: 'bg-gray-100 text-gray-800' },
-    unverified: { label: '未验证', cls: 'bg-yellow-100 text-yellow-800' },
-  };
-  return map[role] || { label: role, cls: 'bg-gray-100 text-gray-800' };
-};
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    active: { label: '正常', cls: 'bg-green-100 text-green-800' },
-    disabled: { label: '禁用', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
+const RoleTag = ({ role }: { role: string }) => <Badge status={role} domain="role" />;
+const StatusTag = ({ status }: { status: string }) => <Badge status={status} domain="user" />;
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
@@ -58,10 +48,6 @@ export default function Users() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [resetId, setResetId] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'groups'>('all');
   const [groups, setGroups] = useState<Array<{ id: string; name: string; description?: string; member_count: number }>>([]);
@@ -74,6 +60,20 @@ export default function Users() {
   const [viewingGroupId, setViewingGroupId] = useState<string | null>(null);
   const [viewingGroupMembers, setViewingGroupMembers] = useState<string[]>([]);
 
+  // 用户组弹窗成员区（参考项目成员管理三区交互）：已选成员 / 候选用户
+  const groupSelectedMembers = useMemo(
+    () => memberSelectedIds.map((id) => users.find((u) => u.id === id)).filter(Boolean) as User[],
+    [memberSelectedIds, users]
+  );
+  const groupCandidates = useMemo(
+    () => filterUsers(users, memberSelectedIds, memberSearch),
+    [users, memberSelectedIds, memberSearch]
+  );
+  const addGroupMember = (uid: string) => {
+    if (!memberSelectedIds.includes(uid)) setMemberSelectedIds((prev) => [...prev, uid]);
+  };
+  const removeGroupMember = (uid: string) => setMemberSelectedIds((prev) => prev.filter((x) => x !== uid));
+
   const { sortedData, handleSort, getSortIcon } = useTableSort<User>(users);
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function Users() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const res = await usersApi.list();
+      const res = await usersApi.list({ limit: 500 });
       const data = res.data;
       setUsers(Array.isArray(data) ? data : (data as any)?.items || []);
     } catch {
@@ -130,83 +130,6 @@ export default function Users() {
   useEffect(() => {
     if (activeTab === 'groups') loadGroups();
   }, [activeTab]);
-
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await usersApi.list();
-      const data = res.data;
-      const list: User[] = Array.isArray(data) ? data : (data as any)?.items || [];
-      if (list.length === 0) {
-        alert('无用户数据可导出');
-        return;
-      }
-
-      const rows = list.map((u) => ({
-        '用户名': u.username,
-        '姓名': u.real_name,
-        '角色': (() => { const m: Record<string, string> = { admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客', unverified: '未验证' }; return m[u.role] || u.role; })(),
-        '部门': u.department || '',
-        '电话': u.phone || '',
-        '状态': u.status === 'active' ? '启用' : '禁用',
-        '创建时间': u.created_at || '',
-        '更新时间': u.updated_at || '',
-      }));
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 20 }, { wch: 20 }];
-      XLSX.utils.book_append_sheet(wb, ws, '用户清单');
-      const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = '用户清单.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      alert(e?.message || '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setImportStatus('正在分析...');
-    try {
-      const preview = await previewUsersImport(file);
-      const validCount = preview.rows.filter((r) => r.status !== '错误').length;
-      const errorCount = preview.rows.length - validCount;
-      let msg = `共 ${preview.rows.length} 条：新增 ${preview.rows.filter((r) => r.status === '新增').length} 条，更新 ${preview.rows.filter((r) => r.status === '更新').length} 条`;
-      if (errorCount > 0) msg += `，${errorCount} 条错误`;
-      if (!confirm(`${msg}\n\n确认执行导入？`)) {
-        setImporting(false);
-        setImportStatus('');
-        e.target.value = '';
-        return;
-      }
-      setImportStatus('正在导入...');
-      await executeUsersImport(preview);
-      setImportStatus('导入完成');
-      await loadUsers();
-    } catch (err: any) {
-      alert(err?.message || '导入失败');
-      setImportStatus('');
-    } finally {
-      setImporting(false);
-      e.target.value = '';
-    }
-  };
 
   const handleAdd = () => {
     setEditingUser(null);
@@ -286,7 +209,7 @@ export default function Users() {
       setDeleteId(null);
       await loadUsers();
     } catch {
-      alert('删除失败');
+      toast.error('删除失败');
     }
   };
 
@@ -296,30 +219,38 @@ export default function Users() {
       await usersApi.update(resetId, { password: '123456' });
       setResetId(null);
     } catch {
-      alert('重置密码失败');
+      toast.error('重置密码失败');
     }
   };
 
+  // 保存用户组 loading/错误（阶段2c 补缺口）
+  const [groupSaving, setGroupSaving] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
   const saveGroup = async () => {
-    let groupId = editingGroup?.id || '';
-    if (editingGroup) {
-      await userGroupsApi.update(editingGroup.id, groupForm);
-    } else {
-      const res = await userGroupsApi.create(groupForm);
-      groupId = (res.data as any)?.id || '';
+    setGroupSaving(true); setGroupError(null);
+    try {
+      let groupId = editingGroup?.id || '';
+      if (editingGroup) {
+        await userGroupsApi.update(editingGroup.id, groupForm);
+      } else {
+        const res = await userGroupsApi.create(groupForm);
+        groupId = (res.data as any)?.id || '';
+      }
+      if (groupId) {
+        await userGroupsApi.setMembers(groupId, memberSelectedIds);
+      }
+      setGroupModalOpen(false);
+      await loadGroups();
+    } catch (err: any) {
+      setGroupError(err?.response?.data?.detail || '保存失败，请重试');
+    } finally {
+      setGroupSaving(false);
     }
-    if (groupId) {
-      await userGroupsApi.setMembers(groupId, memberSelectedIds);
-    }
-    setGroupModalOpen(false);
-    await loadGroups();
   };
 
-  const removeGroup = async (id: string) => {
-    if (!window.confirm('确定删除该用户组？文档将恢复为全员可访问。')) return;
-    await userGroupsApi.delete(id);
-    await loadGroups();
-  };
+  // 删除用户组确认（状态驱动 ConfirmModal）
+  const [confirmGroupId, setConfirmGroupId] = useState<string | null>(null);
+  const removeGroup = (id: string) => setConfirmGroupId(id);
 
   const viewGroupDetail = async (groupId: string) => {
     setViewingGroupId(groupId);
@@ -346,123 +277,87 @@ export default function Users() {
   return (
     <div>
       {/* Tab 切换栏 */}
-      <div className="flex gap-2 mb-4 border-b border-gray-200">
+      <div className="flex gap-2 mb-4 border-b border-[var(--ui-border)]">
         <button
-          className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+          className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
           onClick={() => setActiveTab('all')}
         >全部用户</button>
+        {can('user_groups:read' as any) && (
+          <button
+            className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
+            onClick={() => setActiveTab('groups')}
+          >用户组</button>
+        )}
         {isAdmin() && (
           <button
-            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+            className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
             onClick={() => setActiveTab('pending')}
           >
             待审批
             {unverifiedUsers.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                {unverifiedUsers.length}
-              </span>
+              <span className="ml-1.5"><Badge size="xs" tone="amber" label={unverifiedUsers.length} /></span>
             )}
           </button>
-        )}
-        {can('user_groups:read' as any) && (
-          <button
-            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
-            onClick={() => setActiveTab('groups')}
-          >用户组</button>
         )}
       </div>
 
       {/* 用户 Tab */}
       {activeTab === 'all' && (
         <>
-      {/* 头部 */}
-      <div className="flex items-center justify-between mb-4">
-        {/* 导入导出（仅管理员） */}
-        {isAdmin() && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 disabled:opacity-50"
-            >
-              {exporting ? '导出中...' : '导出用户'}
-            </button>
-            <button
-              onClick={handleImportClick}
-              disabled={importing}
-              className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50"
-            >
-              {importing ? (importStatus || '导入中...') : '导入用户'}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx"
-              onChange={handleImportFile}
-              className="hidden"
-            />
-          </div>
-        )}
-        {isAdmin() && (
-          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-            + 新增用户
-          </button>
-        )}
-      </div>
-
-      {/* 搜索 */}
-      <div className="mb-4">
-        <input
+      {/* 头部：搜索 + 新增用户 */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <Input
           type="text"
           placeholder="搜索用户名/姓名/部门..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 w-full max-w-md"
+          className="max-w-md"
         />
+        {isAdmin() && (
+          <Button onClick={handleAdd}>
+            + 新增用户
+          </Button>
+        )}
       </div>
 
       {/* 列表 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th onClick={() => handleSort('username' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">用户名 {getSortIcon('username' as keyof User)}</th>
-              <th onClick={() => handleSort('real_name' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">姓名 {getSortIcon('real_name' as keyof User)}</th>
-              <th onClick={() => handleSort('role' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">角色 {getSortIcon('role' as keyof User)}</th>
-              <th onClick={() => handleSort('department' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">部门 {getSortIcon('department' as keyof User)}</th>
-              <th onClick={() => handleSort('status' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof User)}</th>
-              <th onClick={() => handleSort('created_at' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">创建时间 {getSortIcon('created_at' as keyof User)}</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
+              <th onClick={() => handleSort('username' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">用户名 {getSortIcon('username' as keyof User)}</th>
+              <th onClick={() => handleSort('real_name' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">姓名 {getSortIcon('real_name' as keyof User)}</th>
+              <th onClick={() => handleSort('role' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">角色 {getSortIcon('role' as keyof User)}</th>
+              <th onClick={() => handleSort('department' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">部门 {getSortIcon('department' as keyof User)}</th>
+              <th onClick={() => handleSort('status' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">状态 {getSortIcon('status' as keyof User)}</th>
+              <th onClick={() => handleSort('created_at' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">创建时间 {getSortIcon('created_at' as keyof User)}</th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : displayData.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : (
               displayData.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
+                <tr key={user.id} className="hover:bg-[var(--ui-bg-hover)]">
                   <td className="px-4 py-3 text-sm font-medium">{user.username}</td>
                   <td className="px-4 py-3 text-sm">{user.real_name}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${roleTag(user.role).cls}`}>
-                      {roleTag(user.role).label}
-                    </span>
+                    <RoleTag role={user.role} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{user.department || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">{user.department || '-'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${statusTag(user.status).cls}`}>
-                      {statusTag(user.status).label}
-                    </span>
+                    <StatusTag status={user.status} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(user.created_at)}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">{formatDateTime(user.created_at)}</td>
                 <td className="px-4 py-3 text-right">
                     {isAdmin() && (
                       <>
-                        <button onClick={() => handleEdit(user)} className="text-primary-600 hover:text-primary-800 mr-2">编辑</button>
-                        <button type="button" onClick={() => setResetId(user.id)} className="text-orange-600 hover:text-orange-800 mr-2">重置密码</button>
-                        <button type="button" onClick={() => setDeleteId(user.id)} className="text-red-600 hover:text-red-800">删除</button>
+                        <Button variant="link" size="xs" className="mr-2" onClick={() => handleEdit(user)}>编辑</Button>
+                        <Button variant="link" size="xs" className="mr-2" type="button" onClick={() => setResetId(user.id)}>重置密码</Button>
+                        <Button variant="danger" size="xs" type="button" onClick={() => setDeleteId(user.id)}>删除</Button>
                       </>
                     )}
                   </td>
@@ -478,101 +373,84 @@ export default function Users() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 用户名（仅新增） */}
           {!editingUser && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">用户名 <span className="text-red-500">*</span></label>
-              <input
+            <FormField label="用户名" required>
+              <Input
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
                 minLength={3}
                 maxLength={64}
                 placeholder="3-64个字符"
               />
-              {editingUser && (
-                <p className="text-xs text-gray-400 mt-1">用户名不可修改</p>
-              )}
-            </div>
+            </FormField>
           )}
 
           {editingUser && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-              <input type="text" value={formData.username} disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500" />
-            </div>
+            <FormField label="用户名">
+              <Input type="text" value={formData.username} disabled />
+            </FormField>
           )}
 
           {/* 姓名 + 角色 */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">姓名 <span className="text-red-500">*</span></label>
-              <input
+            <FormField label="姓名" required>
+              <Input
                 type="text"
                 value={formData.real_name}
                 onChange={(e) => setFormData({ ...formData, real_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">角色 <span className="text-red-500">*</span></label>
-              <select
+            </FormField>
+            <FormField label="角色" required>
+              <Select
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="admin">管理员</option>
                 <option value="engineer">工程师</option>
                 <option value="production">生产人员</option>
                 <option value="guest">访客</option>
-              </select>
-            </div>
+              </Select>
+            </FormField>
           </div>
 
           {/* 部门 + 电话 */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">部门</label>
-              <input
+            <FormField label="部门">
+              <Input
                 type="text"
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">电话</label>
-              <input
+            </FormField>
+            <FormField label="电话">
+              <Input
                 type="text"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
-            </div>
+            </FormField>
           </div>
 
           {/* 状态（仅编辑） */}
           {editingUser && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
-              <select
+            <FormField label="状态">
+              <Select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="active">正常</option>
                 <option value="disabled">禁用</option>
-              </select>
-            </div>
+              </Select>
+            </FormField>
           )}
 
           {/* 所属组 */}
           {isAdmin() && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">所属组</label>
-              <div className="max-h-32 overflow-auto border border-gray-200 rounded p-2">
-                {groups.length === 0 && <span className="text-gray-400 text-sm">暂无用户组</span>}
+            <FormField label="所属组">
+              <div className="max-h-32 overflow-auto border border-[var(--ui-border)] rounded p-2">
+                {groups.length === 0 && <span className="text-[var(--ui-text-tertiary)] text-sm">暂无用户组</span>}
                 {groups.map((g) => (
                   <label key={g.id} className="flex items-center gap-2 py-0.5">
                     <input
@@ -585,36 +463,30 @@ export default function Users() {
                   </label>
                 ))}
               </div>
-            </div>
+            </FormField>
           )}
 
           {/* 密码 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              密码 {editingUser ? '' : <span className="text-red-500">*</span>}
-            </label>
-            <input
+          <FormField label="密码" required={!editingUser}>
+            <Input
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               minLength={6}
               placeholder={editingUser ? '留空则不修改密码' : '至少6个字符'}
               {...((!editingUser) ? { required: true } : {})}
             />
-          </div>
+          </FormField>
 
           {saveError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-              {saveError}
-            </div>
+            <Alert tone="danger">{saveError}</Alert>
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            <Button type="button" onClick={() => setModalOpen(false)} variant="secondary">取消</Button>
+            <Button type="submit" disabled={saving}>
               {saving ? '保存中...' : '保存'}
-            </button>
+            </Button>
           </div>
         </form>
       </Modal>
@@ -641,6 +513,27 @@ export default function Users() {
         onConfirm={handleResetPassword}
         onCancel={() => setResetId(null)}
       />
+
+      {/* 删除用户组确认 */}
+      <ConfirmModal
+        open={!!confirmGroupId}
+        title="确认删除"
+        content="确定删除该用户组？文档将恢复为全员可访问。"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmGroupId) return;
+          try {
+            await userGroupsApi.delete(confirmGroupId);
+            await loadGroups();
+          } catch (e: any) {
+            toast.error(e?.response?.data?.detail || '删除用户组失败');
+          }
+          setConfirmGroupId(null);
+        }}
+        onCancel={() => setConfirmGroupId(null)}
+      />
         </>
       )}
 
@@ -653,14 +546,14 @@ export default function Users() {
             </h2>
           </div>
           {unverifiedUsers.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-[var(--ui-text-tertiary)]">
               <div className="text-4xl mb-3">&#x2705;</div>
               <p>暂无待审批用户</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50 text-left text-sm text-gray-600">
+                <tr className="border-b bg-[var(--ui-bg-subtle)] text-left text-sm text-[var(--ui-text-secondary)]">
                   <th className="px-4 py-2.5">用户名</th>
                   <th className="px-4 py-2.5">姓名</th>
                   <th className="px-4 py-2.5">申请时间</th>
@@ -669,26 +562,27 @@ export default function Users() {
               </thead>
               <tbody>
                 {unverifiedUsers.map((u) => (
-                  <tr key={u.id} className="border-b hover:bg-gray-50 text-sm">
+                  <tr key={u.id} className="border-b hover:bg-[var(--ui-bg-hover)] text-sm">
                     <td className="px-4 py-2.5 font-medium text-gray-800">{u.username}</td>
-                    <td className="px-4 py-2.5 text-gray-600">{u.real_name || '-'}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{u.created_at?.slice(0, 10) || '-'}</td>
+                    <td className="px-4 py-2.5 text-[var(--ui-text-secondary)]">{u.real_name || '-'}</td>
+                    <td className="px-4 py-2.5 text-[var(--ui-text-secondary)]">{u.created_at?.slice(0, 10) || '-'}</td>
                     <td className="px-4 py-2.5">
                       {approvingId === u.id ? (
-                        <span className="text-gray-400 text-xs">处理中...</span>
+                        <span className="text-[var(--ui-text-tertiary)] text-xs">处理中...</span>
                       ) : (
-                        <select
+                        <Select
+                          size="xs"
                           defaultValue=""
                           onChange={(e) => {
                             if (e.target.value) handleApprove(u.id, e.target.value);
                           }}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded bg-white cursor-pointer select-none whitespace-nowrap"
+                          className="cursor-pointer select-none whitespace-nowrap"
                         >
                           <option value="" disabled>审批</option>
                           <option value="engineer">工程师</option>
                           <option value="production">生产人员</option>
                           <option value="guest">访客</option>
-                        </select>
+                        </Select>
                       )}
                     </td>
                   </tr>
@@ -704,35 +598,34 @@ export default function Users() {
         <div>
           <div className="flex justify-end mb-3">
             {isAdmin() && (
-              <button
-                className="px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700"
+              <Button size="sm"
                 onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '' }); setMemberSelectedIds([]); setMemberSearch(''); setGroupModalOpen(true); }}
-              >新建用户组</button>
+              >新建用户组</Button>
             )}
           </div>
-          <table className="min-w-full divide-y divide-gray-200 bg-white rounded-lg border border-gray-200">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">名称</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">描述</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">成员数</th>
-              {isAdmin() && <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">操作</th>}
+          <table className="min-w-full divide-y divide-gray-200 bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)]">
+            <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><tr>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">描述</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">成员数</th>
+              {isAdmin() && <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {groups.map((g) => (
-                <tr key={g.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => viewGroupDetail(g.id)}>
+                <tr key={g.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => viewGroupDetail(g.id)}>
                   <td className="px-4 py-2 text-sm font-medium">{g.name}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600">{g.description || '-'}</td>
+                  <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{g.description || '-'}</td>
                   <td className="px-4 py-2 text-sm">{g.member_count}</td>
                   {isAdmin() && (
                     <td className="px-4 py-2 text-sm space-x-2" onClick={(e) => e.stopPropagation()}>
-                      <button className="text-primary-600 hover:underline" onClick={async () => { setEditingGroup(g); setGroupForm({ name: g.name, description: g.description || '' }); setMemberSearch(''); const res = await userGroupsApi.getMembers(g.id); setMemberSelectedIds((res.data?.user_ids || []).map(String)); setGroupModalOpen(true); }}>编辑</button>
-                      <button className="text-red-600 hover:underline" onClick={() => removeGroup(g.id)}>删除</button>
+                      <Button variant="link" size="xs" onClick={async () => { setEditingGroup(g); setGroupForm({ name: g.name, description: g.description || '' }); setMemberSearch(''); const res = await userGroupsApi.getMembers(g.id); setMemberSelectedIds((res.data?.user_ids || []).map(String)); setGroupModalOpen(true); }}>编辑</Button>
+                      <Button variant="danger" size="xs" onClick={() => removeGroup(g.id)}>删除</Button>
                     </td>
                   )}
                 </tr>
               ))}
               {groups.length === 0 && (
-                <tr><td colSpan={isAdmin() ? 4 : 3} className="px-4 py-8 text-center text-gray-500">暂无用户组</td></tr>
+                <tr><td colSpan={isAdmin() ? 4 : 3} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无用户组</td></tr>
               )}
             </tbody>
           </table>
@@ -740,69 +633,100 @@ export default function Users() {
       )}
 
       {/* 组编辑弹窗 */}
-      <Modal open={groupModalOpen} title={editingGroup ? '编辑用户组' : '新建用户组'} onClose={() => setGroupModalOpen(false)} width="lg">
-        <div className="space-y-4">
+      <Modal
+        open={groupModalOpen}
+        title={editingGroup ? '编辑用户组' : '新建用户组'}
+        onClose={() => { setGroupModalOpen(false); setGroupError(null); }}
+        width="xl"
+        height="75vh"
+        footer={
+          <div className="flex items-center justify-between gap-2 w-full">
+            <span className="text-xs text-[var(--ui-text-tertiary)]">成员 {memberSelectedIds.length} 人</span>
+            <div className="flex items-center gap-2">
+              <Button type="button" onClick={() => { setGroupModalOpen(false); setGroupError(null); }} variant="secondary" disabled={groupSaving}>取消</Button>
+              <Button type="button" onClick={saveGroup} disabled={groupSaving}>{groupSaving ? '保存中...' : '保存'}</Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
-              <input
+            <FormField label="名称" required card>
+              <Input
                 type="text"
                 value={groupForm.name}
                 onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                size="xs"
                 required
                 maxLength={64}
               />
-            </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">描述</label>
-              <input
+            </FormField>
+            <FormField label="描述" card>
+              <Input
                 type="text"
                 value={groupForm.description}
                 onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                size="xs"
                 maxLength={255}
               />
-            </div>
+            </FormField>
           </div>
-          <div className="border-t pt-3">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">成员</h4>
-            <input
-              type="text"
-              placeholder="搜索用户..."
-              value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2 text-sm"
-            />
-            <div className="max-h-52 overflow-auto border border-gray-200 rounded-lg">
-              {users.filter((u) => {
-                if (!memberSearch.trim()) return true;
-                const kw = memberSearch.trim().toLowerCase();
-                return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
-              }).length === 0 ? (
-                <div className="text-sm text-gray-400 py-4 text-center">无匹配用户</div>
-              ) : (
-                users.filter((u) => {
-                  if (!memberSearch.trim()) return true;
-                  const kw = memberSearch.trim().toLowerCase();
-                  return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
-                }).map((u) => (
-                  <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={memberSelectedIds.includes(String(u.id))}
-                      onChange={(e) => setMemberSelectedIds((prev) =>
-                        e.target.checked ? [...prev, String(u.id)] : prev.filter((x) => x !== String(u.id)))}
-                    />
-                    <span className="text-sm">{u.real_name}（{u.username}）<span className="text-gray-400 ml-1">{u.role}</span></span>
-                  </label>
-                ))
+          {groupError && <Alert tone="danger">{groupError}</Alert>}
+
+          {/* 上：已选成员（固定高度滚动容器） */}
+          <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--ui-bg-subtle)] px-3 py-1.5 text-xs text-[var(--ui-text-secondary)]">
+              已选成员（{memberSelectedIds.length}）
+            </div>
+            <div className="h-[168px] overflow-y-auto divide-y divide-[var(--ui-border)]">
+              {groupSelectedMembers.map((u) => (
+                <div key={u.id} className="flex items-center gap-2 px-3 py-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-sm font-medium whitespace-nowrap">{u.real_name}</span>
+                    <span className="text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap truncate min-w-0">({u.username})</span>
+                  </div>
+                  <RoleTag role={u.role} />
+                  <Button variant="danger" size="xs" onClick={() => removeGroupMember(u.id)}>移除</Button>
+                </div>
+              ))}
+              {groupSelectedMembers.length === 0 && (
+                <div className="px-3 py-6 text-center text-xs text-[var(--ui-text-tertiary)]">暂无成员</div>
               )}
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={() => setGroupModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={saveGroup} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+
+          {/* 中：搜索框 */}
+          <Input
+            type="text"
+            placeholder="搜索姓名或账号…"
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+          />
+
+          {/* 下：候选用户（固定高度滚动容器；空搜索=全部可选用户，输入后过滤） */}
+          <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--ui-bg-subtle)] px-3 py-1.5 text-xs text-[var(--ui-text-secondary)] flex items-center justify-between">
+              <span>{memberSearch.trim() ? `匹配结果（${groupCandidates.length}）` : `可选用户（${groupCandidates.length}）`}</span>
+              <span className="text-[var(--ui-text-tertiary)]">已排除已选成员</span>
+            </div>
+            {groupCandidates.length === 0 ? (
+              <div className="px-3 py-6 text-center text-xs text-[var(--ui-text-tertiary)]">
+                {memberSearch.trim() ? '无匹配用户' : '暂无可添加用户'}
+              </div>
+            ) : (
+              <div className="h-[248px] overflow-y-auto divide-y divide-[var(--ui-border)]">
+                {groupCandidates.map((u) => (
+                  <div key={u.id} className="flex items-center gap-2 px-3 py-2">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <span className="text-sm font-medium whitespace-nowrap">{u.real_name}</span>
+                      <span className="text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap truncate min-w-0">({u.username})</span>
+                    </div>
+                    <RoleTag role={u.role} />
+                    <Button size="xs" onClick={() => addGroupMember(u.id)}>添加</Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </Modal>
@@ -815,38 +739,38 @@ export default function Users() {
           <Modal open={!!viewingGroupId} title="用户组详情" onClose={() => setViewingGroupId(null)} width="md">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                   <div className="text-sm font-medium">{g?.name || '-'}</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">成员数</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">成员数</div>
                   <div className="text-sm font-medium">{viewingGroupMembers.length}</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
-                  <div className="text-xs text-gray-500 mb-0.5">描述</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] col-span-2">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</div>
                   <div className="text-sm">{g?.description || '-'}</div>
                 </div>
               </div>
               <div className="border-t pt-3">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">成员列表</h4>
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">成员列表</h4>
                 {memberUsers.length === 0 ? (
-                  <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无成员</div>
+                  <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无成员</div>
                 ) : (
                   <table className="w-full text-sm border rounded-lg overflow-hidden">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-[var(--ui-bg-subtle)] border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">姓名</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">用户名</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">角色</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">姓名</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">用户名</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">角色</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {memberUsers.map((u) => (
                         <tr key={u.id}>
                           <td className="px-3 py-2">{u.real_name}</td>
-                          <td className="px-3 py-2 text-gray-500">{u.username}</td>
-                          <td className="px-3 py-2"><span className={`px-2 py-0.5 text-xs rounded-full ${roleTag(u.role).cls}`}>{roleTag(u.role).label}</span></td>
+                          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{u.username}</td>
+                          <td className="px-3 py-2"><RoleTag role={u.role} /></td>
                         </tr>
                       ))}
                     </tbody>
@@ -855,7 +779,7 @@ export default function Users() {
               </div>
             </div>
             <div className="flex justify-end pt-4 border-t mt-4">
-              <button type="button" onClick={() => setViewingGroupId(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">关闭</button>
+              <Button type="button" onClick={() => setViewingGroupId(null)} variant="secondary">关闭</Button>
             </div>
           </Modal>
         );

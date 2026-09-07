@@ -40,14 +40,17 @@ export interface CompareNode {
   placementChanged?: boolean;
 }
 
-/** 单个实例节点：由左右两侧矩阵匹配生成 */
+/** 单个实例节点：由左右两侧矩阵匹配生成。
+ *  可以是叶子实例（有几何，leftMeshUuids/rightMeshUuids 回填），
+ *  也可以是多实例装配的中间实例（无几何，children 挂该实例下的 BOM 子项行）。 */
 export interface CompareInstanceNode {
   /** 唯一 key，形如 parentKey:inst:idx */
   key: string;
-  changeType: ChangeType; // 'add' | 'delete' | 'none'
+  /** modify = 左右件号相同但版本不同（版本变更，同一实例）；'both' 表示左右两侧都参与匹配 */
+  changeType: ChangeType; // 'add' | 'delete' | 'modify' | 'none' | 'internal'(中间实例聚合)
   /** 该实例所属侧别；'both' 表示左右矩阵匹配 */
   side: Side | 'both';
-  /** 该实例在源侧 instance 数组中的序号 */
+  /** 该实例在源侧 instance 数组中的序号（仅叶子实例有） */
   leftIndex?: number;
   rightIndex?: number;
   /** 左侧那份几何的全部 mesh uuid（含三档 LOD 的每个 mesh；加载后回填，无左份时为空数组） */
@@ -56,4 +59,20 @@ export interface CompareInstanceNode {
   rightMeshUuids: string[];
   /** 实例在同父节点下的序号（1-based） */
   seq: number;
+  /** 该实例下的 BOM 子项行（中间实例展开后显示；递归挂更深实例层） */
+  children?: CompareChildRow[];
+}
+
+/** 实例上下文中的 BOM 子项行视图：同一 BOM 行在不同实例下各自实例化一份。
+ *  node 是左右配对的 BOM 行（渲染左右格子的数据源）；
+ *  instances 是该行在此实例上下文下的实例层；children 是该行的 BOM 子项行。 */
+export interface CompareChildRow {
+  /** 唯一 key：父实例 key + 子 BOM key */
+  key: string;
+  /** 对应的 BOM 配对行（左右格子数据源） */
+  node: CompareNode;
+  /** 该子项行在此实例上下文下的实例层（递归） */
+  instances?: CompareInstanceNode[];
+  /** 该行在此实例上下文下的 BOM 子项行（单实例行无实例层时仍有子项行） */
+  children?: CompareChildRow[];
 }

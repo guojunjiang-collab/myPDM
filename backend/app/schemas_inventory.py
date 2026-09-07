@@ -117,3 +117,5 @@ class DocumentListParams(BaseModel):
     doc_type: Optional[str] = None
     status: Optional[str] = None
     search: Optional[str] = None
+    sort_field: str = 'created_at'
+    sort_order: str = 'desc'

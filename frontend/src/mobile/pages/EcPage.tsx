@@ -1,0 +1,575 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ecrApi, ecoApi } from '../../services/api';
+import { useDebounced } from '../../hooks/useDebounced';
+import MobileCardList from '../components/MobileCardList';
+import Badge from '../../components/ui/Badge';
+import { resolveBadge } from '../../constants/badges';
+import type { BadgeDomain } from '../../constants/badges';
+import EmptyState from '../components/EmptyState';
+import { formatMeta } from '../components/formatMeta';
+import type {
+  ECRRequest,
+  ECORequest,
+  ECRReviewRecord,
+  ECOReviewRecord,
+  ECRStatusLog,
+  ECOStatusLog,
+  ECRAffectedItem,
+} from '../../types';
+
+/* ================================================================
+   变更管理移动页（只读）
+   - 独立界面：/ec/ecr 仅显示 ECR（工程变更请求）、/ec/eco 仅显示 ECO（工程变更指令），
+     对应桌面 EC.tsx 两个 tab，移动端拆分为两个独立入口界面（无 Tab 切换）
+   - 详情为独立子路由（ec/ecr/:id、ec/eco/:id，浏览器返回/深链可用）：
+     · ECR 详情：基础信息 + 影响项 + 审批记录 + 状态流转
+     · ECO 详情：基础信息 + 执行项 + 审批记录 + 状态流转
+   - 纯只读：无新建/编辑/提交/审批/执行/关闭/删除等任何状态流转入口
+   - API 核验（对应桌面 ECRList/ECOList/ECRDetailModal/ECODetailModal）：
+     · ecrApi.list({page:1,page_size:100}) → GET /api/ecrs/ → res.data.{items,total}
+     · ecrApi.get(id)                      → GET /api/ecrs/{id} → res.data（含 review_records/affected_items）
+     · ecrApi.getStatusLogs(id)            → GET /api/ecrs/{id}/status-logs → res.data.items
+     · ecoApi.list({page:1,page_size:100}) → GET /api/ecos/ → res.data.{items,total}
+     · ecoApi.detail(id)                   → GET /api/ecos/{id} → res.data（含 execution_items/review_records/status_logs）
+     · ecoApi.getStatusLogs(id)            → GET /api/ecos/{id}/status-logs → res.data.items
+   ================================================================ */
+
+const CATEGORY_LABEL: Record<string, string> = {
+  design_change: '设计变更',
+  process_change: '工艺变更',
+  material_change: '物料变更',
+  other: '其他',
+};
+
+const EXEC_ACTION_LABEL: Record<string, string> = {
+  create: '新建',
+  upgrade: '升级',
+  qty_change: '数量变更',
+  delete: '删除',
+  no_change: '不变',
+};
+
+/** ecrApi.get 响应在基础 ECRRequest 上额外携带 review_records（桌面 ECRDetailModal 同款扩展） */
+interface EcrDetail extends ECRRequest {
+  review_records?: ECRReviewRecord[];
+}
+
+function fmtDate(v?: string | null): string {
+  if (!v) return '';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
+}
+
+function fmtDateTime(v?: string | null): string {
+  if (!v) return '';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN');
+}
+
+function ReviewRecords({ records }: { records: Array<{ id?: string; reviewer_name?: string; reviewer_id?: string; decision?: string; comment?: string; created_at?: string }> }) {
+  if (records.length === 0) return <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无审批记录</div>;
+  return (
+    <div className="flex flex-col gap-2">
+      {records.map((r) => (
+        <div key={r.id ?? r.reviewer_id ?? r.created_at ?? 'r'} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[var(--ui-text-primary)]">{r.reviewer_name || r.reviewer_id || '-'}</span>
+            <Badge
+              tone={r.decision === 'approved' ? 'green' : r.decision === 'rejected' ? 'red' : 'orange'}
+              label={r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
+            />
+          </div>
+          {r.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-1">{r.comment}</div>}
+          {r.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-1">{fmtDateTime(r.created_at)}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatusLogs({ logs, domain }: { logs: Array<{ id?: string; to_status?: string; operator_name?: string; comment?: string; created_at?: string }>; domain: BadgeDomain }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {logs.map((log) => (
+        <div key={log.id ?? log.created_at ?? 'l'} className="flex gap-3">
+          <div className="w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 bg-primary-500" />
+          <div className="flex-1 pb-1">
+            <div className="text-sm text-[var(--ui-text-primary)] break-all">
+              <span className="font-medium">{log.operator_name || '-'}</span>
+              <span className="text-[var(--ui-text-tertiary)] mx-1">·</span>
+              <span>{resolveBadge(log.to_status, domain).label || log.to_status || '-'}</span>
+            </div>
+            {log.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>}
+            {log.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">{fmtDateTime(log.created_at)}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface Props {
+  /** 覆盖层模式（详情栈内嵌）传入的详情信息；路由模式缺省时从 /ec/ecr/:id、/ec/eco/:id 读取 */
+  detail?: { kind: 'eco' | 'ecr'; id: string };
+  /** 覆盖层模式返回回调（缺省时返回按钮走 navigate(-1)） */
+  onBack?: () => void;
+}
+
+export default function EcPage({ detail, onBack }: Props = {}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id: paramId } = useParams<{ id?: string }>();
+  // 详情路由区分：/ec/ecr/:id 与 /ec/eco/:id（覆盖层模式由 detail 决定）
+  const id = detail?.id ?? paramId;
+  const isEco = detail ? detail.kind === 'eco' : location.pathname.includes('/eco/');
+
+  // 独立路由模式（列表 ↔ 详情同组件切换）：进入详情保存列表滚动位置，返回列表恢复
+  const hadDetailRef = useRef(false);
+  useEffect(() => {
+    if (id) {
+      hadDetailRef.current = true;
+      return;
+    }
+    if (hadDetailRef.current) {
+      hadDetailRef.current = false;
+      const saved = Number(sessionStorage.getItem('mobile.ec.scroll') || '0');
+      if (saved > 0) {
+        requestAnimationFrame(() => document.querySelector('main')?.scrollTo(0, saved));
+      }
+    }
+  }, [id]);
+
+  const [tab] = useState<'ecr' | 'eco'>(() =>
+    // 独立界面：/ec/ecr → ECR、/ec/eco → ECO（详情路由同理）；tab 仅作为当前界面标识
+    location.pathname.includes('/eco') ? 'eco' : 'ecr',
+  );
+
+  /* ---- ECR 列表 ---- */
+  const [ecrs, setEcrs] = useState<ECRRequest[]>([]);
+  const [ecrsLoading, setEcrsLoading] = useState(false);
+  const [ecrsError, setEcrsError] = useState<string | null>(null);
+  const [ecrSearch, setEcrSearch] = useState('');
+  const debouncedEcr = useDebounced(ecrSearch, 400);
+
+  /* ---- ECO 列表 ---- */
+  const [ecos, setEcos] = useState<ECORequest[]>([]);
+  const [ecosLoading, setEcosLoading] = useState(false);
+  const [ecosError, setEcosError] = useState<string | null>(null);
+  const [ecoSearch, setEcoSearch] = useState('');
+  const debouncedEco = useDebounced(ecoSearch, 400);
+
+  useEffect(() => {
+    let alive = true;
+    setEcrsLoading(true);
+    ecrApi
+      .list({ page: 1, page_size: 100 })
+      .then((res) => {
+        if (alive) {
+          setEcrs(((res.data ?? {}) as { items?: ECRRequest[] }).items ?? []);
+          setEcrsError(null);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setEcrs([]);
+          setEcrsError('加载失败，请稍后重试');
+        }
+      })
+      .finally(() => {
+        if (alive) setEcrsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    setEcosLoading(true);
+    ecoApi
+      .list({ page: 1, page_size: 100 })
+      .then((res) => {
+        if (alive) {
+          setEcos(((res.data ?? {}) as { items?: ECORequest[] }).items ?? []);
+          setEcosError(null);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setEcos([]);
+          setEcosError('加载失败，请稍后重试');
+        }
+      })
+      .finally(() => {
+        if (alive) setEcosLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const filteredEcrs = useMemo(() => {
+    const kw = debouncedEcr.trim().toLowerCase();
+    if (!kw) return ecrs;
+    return ecrs.filter((e) => e.ecr_number.toLowerCase().includes(kw) || e.title.toLowerCase().includes(kw));
+  }, [ecrs, debouncedEcr]);
+
+  const filteredEcos = useMemo(() => {
+    const kw = debouncedEco.trim().toLowerCase();
+    if (!kw) return ecos;
+    return ecos.filter((e) => e.eco_number.toLowerCase().includes(kw) || e.title.toLowerCase().includes(kw));
+  }, [ecos, debouncedEco]);
+
+  /* ---------------- 详情视图（子路由 /ec/ecr/:id 或 /ec/eco/:id / 覆盖层 detail） ---------------- */
+  if (id) {
+    const back = onBack ? onBack : () => navigate(-1);
+    return isEco ? (
+      <EcoDetailView ecoId={id} onBack={back} />
+    ) : (
+      <EcrDetailView ecrId={id} onBack={back} />
+    );
+  }
+
+  /* ---------------- 列表视图（独立界面：ECR 或 ECO，无 Tab 切换） ---------------- */
+  return (
+    <div className="flex flex-col h-full">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
+        <div className="text-sm font-semibold text-[var(--ui-text-primary)] mb-2">{isEco ? 'ECO 变更单' : 'ECR 变更请求'}</div>
+        <input
+          className="w-full h-11 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
+          placeholder="搜索编号/标题..."
+          value={isEco ? ecoSearch : ecrSearch}
+          onChange={(e) => (isEco ? setEcoSearch(e.target.value) : setEcrSearch(e.target.value))}
+        />
+      </div>
+
+      {!isEco && (
+        <>
+          {ecrsLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
+          {!ecrsLoading && ecrsError && <p className="text-center text-xs text-red-400 py-3">{ecrsError}</p>}
+          {!ecrsLoading && !ecrsError && filteredEcrs.length === 0 && <EmptyState text="暂无 ECR" />}
+          <MobileCardList
+            items={filteredEcrs}
+            keyOf={(e) => e.id}
+            renderMain={(e) => e.ecr_number}
+            renderMeta={(e) => (
+              <span className="flex flex-wrap items-center gap-2">
+                <Badge status={e.status} domain="ecr" />
+                <Badge status={e.priority} domain="priority" />
+                <span>
+                  {formatMeta([
+                    ['标题', e.title],
+                    ['创建人', e.creator_name || undefined],
+                    ['创建时间', fmtDate(e.created_at)],
+                  ])}
+                </span>
+              </span>
+            )}
+            onClick={(e) => {
+              // 保存列表滚动位置（详情返回时恢复）
+              sessionStorage.setItem('mobile.ec.scroll', String(document.querySelector('main')?.scrollTop ?? 0));
+              navigate(`/ec/ecr/${e.id}`);
+            }}
+          />
+        </>
+      )}
+
+      {isEco && (
+        <>
+          {ecosLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
+          {!ecosLoading && ecosError && <p className="text-center text-xs text-red-400 py-3">{ecosError}</p>}
+          {!ecosLoading && !ecosError && filteredEcos.length === 0 && <EmptyState text="暂无 ECO" />}
+          <MobileCardList
+            items={filteredEcos}
+            keyOf={(e) => e.id}
+            renderMain={(e) => e.eco_number}
+            renderMeta={(e) => (
+              <span className="flex flex-wrap items-center gap-2">
+                <Badge status={e.status} domain="eco" />
+                <Badge status={e.priority} domain="priority" />
+                <span>
+                  {formatMeta([
+                    ['标题', e.title],
+                    ['创建人', e.creator_name || undefined],
+                    ['创建时间', fmtDate(e.created_at)],
+                  ])}
+                </span>
+              </span>
+            )}
+            onClick={(e) => {
+              // 保存列表滚动位置（详情返回时恢复）
+              sessionStorage.setItem('mobile.ec.scroll', String(document.querySelector('main')?.scrollTop ?? 0));
+              navigate(`/ec/eco/${e.id}`);
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ==================== ECR 详情（/ec/ecr/:id） ==================== */
+
+function EcrDetailView({ ecrId, onBack }: { ecrId: string; onBack: () => void }) {
+  const [ecr, setEcr] = useState<EcrDetail | null>(null);
+  const [statusLogs, setStatusLogs] = useState<ECRStatusLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    ecrApi
+      .get(ecrId)
+      .then((res) => {
+        if (alive) {
+          setEcr((res.data ?? null) as EcrDetail | null);
+          setError(null);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setEcr(null);
+          setError('加载失败，请稍后重试');
+        }
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    // 状态流转非关键数据，失败静默（桌面 ECRDetailModal 同款处理）
+    ecrApi
+      .getStatusLogs(ecrId)
+      .then((res) => {
+        if (!alive) return;
+        const data = (res.data ?? {}) as { items?: ECRStatusLog[] };
+        const list = Array.isArray(res.data) ? (res.data as ECRStatusLog[]) : data.items || [];
+        setStatusLogs(list);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [ecrId]);
+
+  const title = ecr ? `${ecr.ecr_number} ${ecr.title}` : ecrId;
+
+  return (
+    <div className="flex flex-col">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
+        <div className="flex items-center gap-1 min-h-10">
+          <button
+            aria-label="返回"
+            onClick={onBack}
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
+          >
+            ‹
+          </button>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{title}</div>
+        </div>
+      </div>
+
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
+      {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
+      {!loading && !error && !ecr && <EmptyState text="未找到 ECR" />}
+
+      {!loading && !error && ecr && (
+        <div className="p-3 flex flex-col gap-3">
+          {/* 基础信息 */}
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Badge status={ecr.status} domain="ecr" />
+              <Badge status={ecr.priority} domain="priority" />
+            </div>
+            <div className="mt-2 text-sm text-[var(--ui-text-primary)] break-all">{ecr.ecr_number} {ecr.title}</div>
+            <div className="mt-1 text-xs text-[var(--ui-text-secondary)]">
+              {formatMeta([
+                ['类别', CATEGORY_LABEL[ecr.category || ''] || ecr.category || undefined],
+                ['审批模式', ecr.review_mode === 'any' ? '或签' : '会签'],
+                ['创建人', ecr.creator_name || undefined],
+                ['创建时间', fmtDateTime(ecr.created_at)],
+                ['审批进度', ecr.reviewers_count ? `${ecr.approved_count}/${ecr.reviewers_count}` : undefined],
+                ['关联 ECO', ecr.eco_id || undefined],
+              ])}
+            </div>
+            {ecr.reason && <div className="mt-2 text-xs text-[var(--ui-text-secondary)] whitespace-pre-wrap">原因：{ecr.reason}</div>}
+          </div>
+
+          {/* 影响项 */}
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+            <div className="text-sm font-medium text-gray-800 mb-2">影响项（{(ecr.affected_items || []).length}）</div>
+            {(ecr.affected_items || []).length === 0 ? (
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无影响项</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {(ecr.affected_items || []).map((it: ECRAffectedItem) => (
+                  <div key={it.id} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
+                    <div className="text-sm text-[var(--ui-text-primary)] break-all">
+                      {it.entity_code ? `${it.entity_code} ${it.entity_name}` : it.entity_name}
+                    </div>
+                    <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">
+                      {formatMeta([
+                        ['类型', it.entity_type === 'assembly' ? '部件' : it.entity_type === 'part' ? '零件' : it.entity_type],
+                        ['版本', it.entity_version || undefined],
+                        ['变更', it.change_type || undefined],
+                      ])}
+                    </div>
+                    {it.change_description && <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5 whitespace-pre-wrap">{it.change_description}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 审批记录 */}
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+            <div className="text-sm font-medium text-gray-800 mb-2">审批记录</div>
+            <ReviewRecords records={ecr.review_records || []} />
+          </div>
+
+          {/* 状态流转 */}
+          {statusLogs.length > 0 && (
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+              <div className="text-sm font-medium text-gray-800 mb-2">状态流转</div>
+              <StatusLogs logs={statusLogs} domain="ecr" />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ==================== ECO 详情（/ec/eco/:id） ==================== */
+
+function EcoDetailView({ ecoId, onBack }: { ecoId: string; onBack: () => void }) {
+  const [eco, setEco] = useState<ECORequest | null>(null);
+  const [statusLogs, setStatusLogs] = useState<ECOStatusLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    ecoApi
+      .detail(ecoId)
+      .then((res) => {
+        if (alive) {
+          setEco((res.data ?? null) as ECORequest | null);
+          setError(null);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setEco(null);
+          setError('加载失败，请稍后重试');
+        }
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    ecoApi
+      .getStatusLogs(ecoId)
+      .then((res) => {
+        if (!alive) return;
+        const data = (res.data ?? {}) as { items?: ECOStatusLog[] };
+        const list = Array.isArray(res.data) ? (res.data as ECOStatusLog[]) : data.items || [];
+        setStatusLogs(list);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [ecoId]);
+
+  const title = eco ? `${eco.eco_number} ${eco.title}` : ecoId;
+
+  return (
+    <div className="flex flex-col">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
+        <div className="flex items-center gap-1 min-h-10">
+          <button
+            aria-label="返回"
+            onClick={onBack}
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
+          >
+            ‹
+          </button>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{title}</div>
+        </div>
+      </div>
+
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
+      {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
+      {!loading && !error && !eco && <EmptyState text="未找到 ECO" />}
+
+      {!loading && !error && eco && (
+        <div className="p-3 flex flex-col gap-3">
+          {/* 基础信息 */}
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Badge status={eco.status} domain="eco" />
+              <Badge status={eco.priority} domain="priority" />
+            </div>
+            <div className="mt-2 text-sm text-[var(--ui-text-primary)] break-all">{eco.eco_number} {eco.title}</div>
+            <div className="mt-1 text-xs text-[var(--ui-text-secondary)]">
+              {formatMeta([
+                ['类别', CATEGORY_LABEL[eco.category || ''] || eco.category || undefined],
+                ['审批模式', eco.review_mode === 'any' ? '或签' : '会签'],
+                ['创建人', eco.creator_name || undefined],
+                ['创建时间', fmtDateTime(eco.created_at)],
+                ['审批进度', eco.reviewers_count ? `${eco.approved_count}/${eco.reviewers_count}` : undefined],
+                ['执行进度', eco.execution_count ? `${eco.execution_completed_count}/${eco.execution_count}` : undefined],
+                ['关联 ECR', eco.ecr_number || undefined],
+              ])}
+            </div>
+            {eco.reason && <div className="mt-2 text-xs text-[var(--ui-text-secondary)] whitespace-pre-wrap">原因：{eco.reason}</div>}
+          </div>
+
+          {/* 执行项 */}
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+            <div className="text-sm font-medium text-gray-800 mb-2">执行项（{(eco.execution_items || []).length}）</div>
+            {(eco.execution_items || []).length === 0 ? (
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无执行项</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {(eco.execution_items || []).map((it) => (
+                  <div key={it.id} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
+                    <div className="text-sm text-[var(--ui-text-primary)] break-all">
+                      {it.entity_code ? `${it.entity_code} ${it.entity_name}` : it.entity_name}
+                    </div>
+                    <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5 flex flex-wrap items-center gap-2">
+                      <Badge status={it.status} domain="exec" />
+                      <span>
+                        {formatMeta([
+                          ['动作', EXEC_ACTION_LABEL[it.action] || it.action],
+                          ['类型', it.entity_type === 'assembly' ? '部件' : it.entity_type === 'part' ? '零件' : it.entity_type],
+                          ['版本', it.new_version || it.entity_version || undefined],
+                        ])}
+                      </span>
+                    </div>
+                    {it.error_message && <div className="text-xs text-red-500 mt-0.5 whitespace-pre-wrap">{it.error_message}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 审批记录 */}
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+            <div className="text-sm font-medium text-gray-800 mb-2">审批记录</div>
+            <ReviewRecords records={eco.review_records || []} />
+          </div>
+
+          {/* 状态流转 */}
+          {statusLogs.length > 0 && (
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+              <div className="text-sm font-medium text-gray-800 mb-2">状态流转</div>
+              <StatusLogs logs={statusLogs} domain="eco" />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

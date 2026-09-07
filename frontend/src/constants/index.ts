@@ -1,5 +1,5 @@
 // 应用版本
-export const APP_VERSION = 'v3.3.2';
+export const APP_VERSION = 'v3.4.4';
 
 // 状态选项
 export const STATUS_OPTIONS = [
@@ -14,6 +14,7 @@ export const ROLE_OPTIONS = [
   { value: 'admin', label: '管理员', color: 'red' },
   { value: 'engineer', label: '工程师', color: 'blue' },
   { value: 'production', label: '生产人员', color: 'green' },
+  { value: 'unverified', label: '未验证', color: 'amber' },
   { value: 'guest', label: '访客', color: 'gray' },
 ] as const;
 

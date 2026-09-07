@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
 import { documentsApi, mediaApi } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
+import { toast } from './Toast';
 import { formatDateTime } from '../utils/date';
+import Badge from './ui/Badge';
+import SortableTh from './ui/SortableTh';
+import { useTableSort } from '../hooks/useTableSort';
 
 interface DocumentDetailContentProps {
   doc: Document;
@@ -19,16 +23,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
-
-const statusTag = (s: string) => {
-  const tags: Record<string, { label: string; class: string }> = {
-    draft: { label: '草稿', class: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', class: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', class: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', class: 'bg-red-100 text-red-800' },
-  };
-  return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
-};
 
 export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues, onArchivePreview, accessible, groupNames }: DocumentDetailContentProps) {
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
@@ -52,6 +46,8 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
     loadAttachments();
   }, [doc.id]);
 
+  const { sortedData: sortedAttachments, sortField, sortDirection, handleSort } = useTableSort<DocumentAttachment>(attachments);
+
   // 下载附件（直接流式下载，不阻塞界面）
   const handleDownload = async (attId: string, fileName: string) => {
     try {
@@ -64,9 +60,9 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
       document.body.removeChild(a);
     } catch (e: any) {
       if (e?.response?.status === 403) {
-        alert('无权限访问该附件');
+        toast.error('无权限访问该附件');
       } else {
-        alert('下载失败，请重试');
+        toast.error('下载失败，请重试');
       }
     }
   };
@@ -98,7 +94,7 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
       {/* 自定义字段 - 卡片式 */}
       {customFieldDefs.length > 0 && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+          <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {customFieldDefs.map(def => (
               <InfoItem
@@ -117,36 +113,36 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
 
       {/* 附件区域 - 只显示、预览、下载，无上传/删除 */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-bold text-gray-700 mb-2">附件</h4>
+        <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">附件</h4>
 
         {loadingAttachments ? (
-          <div className="text-sm text-gray-500">加载中...</div>
+          <div className="text-sm text-[var(--ui-text-secondary)]">加载中...</div>
         ) : attachments.length === 0 ? (
-          <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
+          <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center border border-dashed border-gray-300 rounded-lg">
             暂无附件
           </div>
         ) : (
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
-                  <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
+                  <SortableTh sortKey="file_name" active={sortField === 'file_name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof DocumentAttachment)} className="text-left">文件名</SortableTh>
+                  <SortableTh sortKey="file_size" active={sortField === 'file_size'} direction={sortDirection} onSort={(k) => handleSort(k as keyof DocumentAttachment)} className="text-left w-24">大小</SortableTh>
+                  <SortableTh sortKey="created_at" active={sortField === 'created_at'} direction={sortDirection} onSort={(k) => handleSort(k as keyof DocumentAttachment)} className="text-left w-40">上传时间</SortableTh>
+                  <SortableTh align="right" className="w-32">操作</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {attachments.map(att => (
-                  <tr key={att.id} className="hover:bg-gray-50">
+                {sortedAttachments.map(att => (
+                  <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                     <td className="px-3 py-2">
                       <span className="text-primary-600">{att.file_name}</span>
                     </td>
-                    <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
-                    <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
+                    <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatFileSize(att.file_size || 0)}</td>
+                    <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatDateTime(att.created_at)}</td>
                 <td className="px-3 py-2 text-right">
                   {(doc as any).accessible === false ? (
-                    <span className="inline-flex items-center gap-1 text-gray-400" title="无权限：需关联用户组成员">
+                    <span className="inline-flex items-center gap-1 text-[var(--ui-text-tertiary)]" title="无权限：需关联用户组成员">
                       🔒 <button className="text-gray-300 cursor-not-allowed" disabled>预览</button> <button className="text-gray-300 cursor-not-allowed" disabled>下载</button>
                     </span>
                   ) : (
@@ -181,19 +177,18 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
 
 function InfoItem({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] ${className || ''}`}>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">{value}</div>
     </div>
   );
 }
 
 function StatusItem({ label, status }: { label: string; status: string }) {
-  const tag = statusTag(status);
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <Badge status={status} />
     </div>
   );
 }

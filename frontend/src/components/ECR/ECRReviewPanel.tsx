@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import type { ECRReviewer, ECRReviewRecord } from '../../types';
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Textarea from '../ui/Textarea';
 
 interface ECRReviewPanelProps {
   reviewers: ECRReviewer[];
@@ -9,13 +12,13 @@ interface ECRReviewPanelProps {
   loading: boolean;
 }
 
-const decisionConfig: Record<string, { label: string; borderColor: string; bgColor: string; icon: string }> = {
-  approved: { label: '已通过', borderColor: 'border-l-green-500', bgColor: 'bg-green-50', icon: '✅' },
-  rejected: { label: '已驳回', borderColor: 'border-l-red-500', bgColor: 'bg-red-50', icon: '❌' },
-  returned: { label: '已退回', borderColor: 'border-l-orange-500', bgColor: 'bg-orange-50', icon: '↩️' },
+const decisionConfig: Record<string, { label: string; tone: 'green' | 'red' | 'orange'; borderColor: string; bgColor: string; icon: string }> = {
+  approved: { label: '已通过', tone: 'green', borderColor: 'border-l-green-500', bgColor: 'bg-green-50', icon: '✅' },
+  rejected: { label: '已驳回', tone: 'red', borderColor: 'border-l-red-500', bgColor: 'bg-red-50', icon: '❌' },
+  returned: { label: '已退回', tone: 'orange', borderColor: 'border-l-orange-500', bgColor: 'bg-orange-50', icon: '↩️' },
 };
 
-const pendingConfig = { label: '待审批', borderColor: 'border-l-gray-300', bgColor: 'bg-white', icon: '⏳' };
+const pendingConfig = { label: '待审批', borderColor: 'border-l-gray-300', bgColor: 'bg-[var(--ui-bg-surface)]', icon: '⏳' };
 
 export function ECRReviewPanel({
   reviewers,
@@ -50,7 +53,7 @@ export function ECRReviewPanel({
 
   if (!reviewers || reviewers.length === 0) {
     return (
-      <div className="text-center text-gray-400 py-8 text-sm">
+      <div className="text-center text-[var(--ui-text-tertiary)] py-8 text-sm">
         👤 暂无审批人
       </div>
     );
@@ -81,35 +84,22 @@ export function ECRReviewPanel({
                     {config ? config.icon : pendingConfig.icon}
                   </span>
                   <div>
-                    <div className="font-medium text-sm text-gray-900">
+                    <div className="font-medium text-sm text-[var(--ui-text-primary)]">
                       {reviewer.user_name}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-[var(--ui-text-secondary)]">
                       {reviewer.role} · 序号 {reviewer.seq}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                      record
-                        ? record.decision === 'approved'
-                          ? 'bg-green-100 text-green-700'
-                          : record.decision === 'rejected'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-orange-100 text-orange-700'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    {config ? config.label : pendingConfig.label}
-                  </span>
+                  <Badge tone={config?.tone ?? 'gray'} label={config?.label ?? '待审批'} />
                   {isCurrentReviewer && isPending && (
-                    <button
+                    <Button size="sm"
                       onClick={() => handleStartReview(reviewer.user_id)}
-                      className="text-xs px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors"
                     >
                       {isExpanded ? '收起' : '审批'}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -117,11 +107,11 @@ export function ECRReviewPanel({
               {/* Review comment if exists */}
               {record && record.comment && (
                 <div className="mt-3 pl-8">
-                  <div className="text-xs text-gray-500 mb-1">审批意见：</div>
-                  <div className="text-sm text-gray-700 bg-white/60 rounded p-2 border border-gray-100">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-1">审批意见：</div>
+                  <div className="text-sm text-gray-700 bg-white/60 rounded p-2 border border-[var(--ui-border)]">
                     {record.comment}
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">
+                  <div className="text-xs text-[var(--ui-text-tertiary)] mt-1">
                     {new Date(record.created_at).toLocaleString('zh-CN')}
                   </div>
                 </div>
@@ -156,31 +146,29 @@ export function ECRReviewPanel({
                     ))}
                   </div>
                   <div className="mb-3">
-                    <label className="block text-xs text-gray-500 mb-1">
+                    <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">
                       审批意见
                     </label>
-                    <textarea
+                    <Textarea
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       rows={2}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      className="resize-none"
                       placeholder="输入审批意见（可选）"
                     />
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <Button size="sm"
                       onClick={() => handleSubmitReview(reviewer.user_id)}
                       disabled={!decision || loading}
-                      className="px-4 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {loading ? '提交中...' : '确认审批'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="secondary" size="sm"
                       onClick={() => setActiveReviewerId(null)}
-                      className="px-4 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                     >
                       取消
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

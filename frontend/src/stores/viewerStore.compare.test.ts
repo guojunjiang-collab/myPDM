@@ -38,7 +38,7 @@ describe('viewerStore compare 分片', () => {
     expect(c.rightMissing).toBe(true);
     expect(c.displayMode).toBe('both');
     expect(c.onlyDiff).toBe(false);
-    expect(c.ghostOpacity).toBe(0.12);
+    expect(useViewerStore.getState().ghostOpacity).toBe(0.12);
     expect(c.selectedKey).toBeNull();
   });
 
@@ -91,7 +91,7 @@ describe('viewerStore compare 分片', () => {
     const c = useViewerStore.getState().compare!;
     expect(c.displayMode).toBe('right');
     expect(c.onlyDiff).toBe(true);
-    expect(c.ghostOpacity).toBe(0.3);
+    expect(useViewerStore.getState().ghostOpacity).toBe(0.3);
   });
 
   it('compare 为 null 时调用对比 actions 不抛错', () => {

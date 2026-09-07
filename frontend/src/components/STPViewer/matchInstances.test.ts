@@ -17,7 +17,7 @@ const rotPerturbed = (delta: number): number[] => {
   return m;
 };
 
-const ref = (index: number, matrix: number[], revisionId = 'rev-A'): InstanceRef => ({ index, matrix, revisionId });
+const ref = (index: number, matrix: number[], revisionId = 'rev-A', code = 'CODE'): InstanceRef => ({ index, matrix, revisionId, code });
 
 describe('isSamePlacement', () => {
   it('完全相同的矩阵视为同一位置', () => {
@@ -69,12 +69,68 @@ describe('matchInstancePairs', () => {
     expect(out.map((m) => m.changeType)).toEqual(['delete', 'add']);
   });
 
-  it('revision 不同但位置相同 → 左删右增（版本参与匹配）', () => {
+  it('revision 不同但件号相同、位置相同 → modify（版本变更，非删除+新增）', () => {
     const out = matchInstancePairs(
-      [ref(0, at(1, 1, 1), 'rev-V1')],
-      [ref(0, at(1, 1, 1), 'rev-V2')],
+      [ref(0, at(1, 1, 1), 'rev-V1', 'P-001')],
+      [ref(0, at(1, 1, 1), 'rev-V2', 'P-001')],
+    );
+    expect(out).toEqual([
+      { changeType: 'modify', side: 'both', leftIndex: 0, rightIndex: 0 },
+    ]);
+  });
+
+  it('revision 与件号都不同但位置相同 → 仍是左删右增', () => {
+    const out = matchInstancePairs(
+      [ref(0, at(1, 1, 1), 'rev-V1', 'P-001')],
+      [ref(0, at(1, 1, 1), 'rev-V2', 'P-002')],
     );
     expect(out.map((m) => m.changeType)).toEqual(['delete', 'add']);
+  });
+
+  it('同位置优先配对同版本（none），不同版本再配 modify', () => {
+    // 左：P-001@V1、P-001@V2；右：P-001@V2、P-001@V1（顺序打乱，位置都相同）
+    const left = [ref(0, at(0, 0, 0), 'V1', 'P-001'), ref(1, at(10, 0, 0), 'V2', 'P-001')];
+    const right = [ref(0, at(10, 0, 0), 'V2', 'P-001'), ref(1, at(0, 0, 0), 'V1', 'P-001')];
+    const out = matchInstancePairs(left, right);
+    expect(out.map((m) => m.changeType)).toEqual(['none', 'none']);
+    expect(out[0].rightIndex).toBe(1);
+    expect(out[1].rightIndex).toBe(0);
+  });
+
+  it('同件号异版本 + 位置不同 → 仍左删右增（位置参与匹配）', () => {
+    const out = matchInstancePairs(
+      [ref(0, at(0, 0, 0), 'V1', 'P-001')],
+      [ref(0, at(50, 0, 0), 'V2', 'P-001')],
+    );
+    expect(out.map((m) => m.changeType)).toEqual(['delete', 'add']);
+  });
+
+  it('原始实例下标与分组数组下标不同时，版本变更仍正确配对（回归）', () => {
+    // left/right 是某节点分组后的子集，元素 index 是完整 instances 数组的下标
+    // （可能远大于分组数组长度）。曾因用 left[m.leftIndex] 索引分组数组而越界崩溃。
+    const left = [ref(5, at(0, 0, 0), 'V1', 'P-001'), ref(8, at(10, 0, 0), 'V1', 'P-002')];
+    const right = [ref(2, at(0, 0, 0), 'V2', 'P-001'), ref(9, at(10, 0, 0), 'V2', 'P-002')];
+    const out = matchInstancePairs(left, right);
+    expect(out.map((m) => m.changeType)).toEqual(['modify', 'modify']);
+    expect(out[0]).toEqual({ changeType: 'modify', side: 'both', leftIndex: 5, rightIndex: 2 });
+    expect(out[1]).toEqual({ changeType: 'modify', side: 'both', leftIndex: 8, rightIndex: 9 });
+  });
+
+  it('混合场景：同版本未变 + 版本变更 + 真删除，右剩余为新增', () => {
+    const left = [
+      ref(0, at(0, 0, 0), 'V1', 'P-001'),   // 右有 V1@同位置 → none
+      ref(1, at(10, 0, 0), 'V1', 'P-002'),  // 右有 V2@同位置 → modify
+      ref(2, at(20, 0, 0), 'V1', 'P-003'),  // 右无 → delete
+    ];
+    const right = [
+      ref(0, at(0, 0, 0), 'V1', 'P-001'),
+      ref(1, at(10, 0, 0), 'V2', 'P-002'),
+      ref(2, at(30, 0, 0), 'V1', 'P-004'),  // 新增
+    ];
+    const out = matchInstancePairs(left, right);
+    expect(out.map((m) => m.changeType)).toEqual(['none', 'modify', 'delete', 'add']);
+    expect(out[1]).toEqual({ changeType: 'modify', side: 'both', leftIndex: 1, rightIndex: 1 });
+    expect(out[3]).toEqual({ changeType: 'add', side: 'right', rightIndex: 2 });
   });
 
   it('数量 3→5 且其中 2 个位置匹配 → 2 none + 1 delete + 3 add', () => {

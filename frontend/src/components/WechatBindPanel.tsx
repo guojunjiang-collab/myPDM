@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { authApi } from '../services/api';
+import Badge from './ui/Badge';
+import { ConfirmModal } from './Modal';
 
 interface WechatProvider {
   key: string;
@@ -42,8 +44,9 @@ export default function WechatBindPanel() {
     }
   };
 
-  const handleUnbind = async (provider: WechatProvider) => {
-    if (!confirm(`确定要解除「${provider.name}」的绑定吗？`)) return;
+  // 解绑确认（状态驱动 ConfirmModal）
+  const [unbindProvider, setUnbindProvider] = useState<WechatProvider | null>(null);
+  const doUnbind = async (provider: WechatProvider) => {
     try {
       await authApi.wechatUnbind(provider.key);
       setBindings((prev) => {
@@ -55,12 +58,13 @@ export default function WechatBindPanel() {
       setError('解除绑定失败，请重试');
     }
   };
+  const handleUnbind = (provider: WechatProvider) => setUnbindProvider(provider);
 
   return (
     <div className="max-w-md">
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6 space-y-4">
         <h3 className="text-lg font-medium">微信绑定</h3>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-[var(--ui-text-secondary)]">
           绑定后，微信扫码登录将直接进入当前账号；每个微信入口只能绑定一个账号。
         </p>
         {error && (
@@ -69,16 +73,16 @@ export default function WechatBindPanel() {
           </div>
         )}
         {loading ? (
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-[var(--ui-text-tertiary)]">加载中...</p>
         ) : providers.length === 0 ? (
-          <p className="text-sm text-gray-400">未配置微信应用</p>
+          <p className="text-sm text-[var(--ui-text-tertiary)]">未配置微信应用</p>
         ) : (
           providers.map((p) => {
             const b = bindings[p.key];
             return (
               <div
                 key={p.key}
-                className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3"
+                className="flex items-center justify-between border border-[var(--ui-border)] rounded-lg px-4 py-3"
               >
                 <div className="flex items-center gap-3">
                   {b?.avatar_url && (
@@ -87,15 +91,15 @@ export default function WechatBindPanel() {
                   <div>
                     <p className="text-sm font-medium">{p.name}</p>
                     {b ? (
-                      <p className="text-xs text-gray-500">{b.name || '已绑定'}</p>
+                      <p className="text-xs text-[var(--ui-text-secondary)]">{b.name || '已绑定'}</p>
                     ) : (
-                      <p className="text-xs text-gray-400">未绑定</p>
+                      <p className="text-xs text-[var(--ui-text-tertiary)]">未绑定</p>
                     )}
                   </div>
                 </div>
                 {b ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full">已绑定</span>
+                    <Badge tone="green" label="已绑定" />
                     <button
                       onClick={() => handleUnbind(p)}
                       className="text-xs text-red-500 hover:text-red-700 hover:underline"
@@ -116,6 +120,18 @@ export default function WechatBindPanel() {
           })
         )}
       </div>
+
+      {/* 解绑确认 */}
+      <ConfirmModal
+        open={!!unbindProvider}
+        title="确认解绑"
+        content={unbindProvider ? `确定要解除「${unbindProvider.name}」的绑定吗？` : ''}
+        confirmText="解除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={() => { if (unbindProvider) doUnbind(unbindProvider); setUnbindProvider(null); }}
+        onCancel={() => setUnbindProvider(null)}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { configurationApi, partsApi, customFieldsApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -8,6 +8,14 @@ import EntityEditModal from '../EntityEditModal';
 import type { ConfigurationItem, CustomFieldDefinition } from '../../types';
 import { useDataStore } from '../../stores/data';
 import CustomFieldInput from '../CustomFieldInput';
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import SortableTh from '../ui/SortableTh';
+import TreeToggle from '../ui/TreeToggle';
+import EntityPickerModal from '../ui/EntityPickerModal';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 interface Props {
   open: boolean;
@@ -53,16 +61,15 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
   // 关联零部件
   const [parts, setParts] = useState<PartEntry[]>([]);
+
+  // 关联零部件表排序（类型列不排序）
+  const { sortedData: sortedParts, sortField: partsSortField, sortDirection: partsSortDirection, handleSort: handlePartsSort } = useTableSort<PartEntry>(parts, { fieldComparators: { part_version: (a, b) => compareVersions(String(a), String(b)) } });
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [versionSelectIdx, setVersionSelectIdx] = useState<number | null>(null);
+  const [versionSelectPartId, setVersionSelectPartId] = useState<string | null>(null);
 
   // 子构型项
   const [children, setChildren] = useState<ChildEntry[]>([]);
   const [cfgPickerOpen, setCfgPickerOpen] = useState(false);
-  const [cfgSearch, setCfgSearch] = useState('');
-  const [cfgResults, setCfgResults] = useState<any[]>([]);
-  const [cfgSearching, setCfgSearching] = useState(false);
-  const cfgReqId = useRef(0);
   const [pickerSelected, setPickerSelected] = useState<any[]>([]);
   const [pickerParentId, setPickerParentId] = useState<string | null>(null); // null=根级, string=指定父级子项
   const [pickerParentIdx, setPickerParentIdx] = useState<string | null>(null); // 父行的 idx，用于标记 has_children
@@ -199,11 +206,11 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
     } finally { setSaving(false); }
   };
 
-  const togglePartRequired = (idx: number) => {
-    setParts(prev => prev.map((p, i) => i === idx ? { ...p, is_required: !p.is_required } : p));
+  const togglePartRequired = (partId: string) => {
+    setParts(prev => prev.map(p => p.part_id === partId ? { ...p, is_required: !p.is_required } : p));
   };
-  const updatePartQuantity = (idx: number, quantity: number) => {
-    setParts(prev => prev.map((p, i) => i === idx ? { ...p, quantity } : p));
+  const updatePartQuantity = (partId: string, quantity: number) => {
+    setParts(prev => prev.map(p => p.part_id === partId ? { ...p, quantity } : p));
   };
   const toggleChildRequired = (idx: number) => {
     setChildren(prev => prev.map((c, i) => i === idx ? { ...c, is_required: !c.is_required } : c));
@@ -328,28 +335,25 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50">
-          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+        <tr key={idx} className="hover:bg-[var(--ui-bg-hover)]">
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             {levelStr}
             {hasChildren && !isEmpty && (
-              <button onClick={(e) => { e.stopPropagation(); toggleChildExpand(idx, childId); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {childRows ? '\u25bc' : '\u25b6'}
-              </button>
+              <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleChildExpand(idx, childId)} size="md" title={childRows ? '折叠' : '展开'} /></span>
             )}
           </td>
           <td className="px-3 py-2 text-sm font-medium cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_code}</td>
           <td className="px-3 py-2 text-sm cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_name}</td>
-          <td className="px-3 py-2 text-sm text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_remark || '-'}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_remark || '-'}</td>
           <td className="px-3 py-2 text-center text-sm">
             {isRoot ? (
-              <input type="number" min={1} value={c.quantity ?? 1}
+              <Input size="xs" type="number" min={1} value={c.quantity ?? 1}
                 onChange={(e) => updateChildQuantity(arrIndex, parseInt(e.target.value) || 1)}
-                className="w-14 text-center text-sm border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                className="!w-14 text-center" />
             ) : (
-              <input type="number" min={1} value={c.quantity ?? 1}
+              <Input size="xs" type="number" min={1} value={c.quantity ?? 1}
                 onChange={(e) => updateNestedField(c, 'quantity', parseInt(e.target.value) || 1)}
-                className="w-14 text-center text-sm border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                className="!w-14 text-center" />
             )}
           </td>
           <td className="px-3 py-2 text-center text-sm">
@@ -357,56 +361,31 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               if (isRoot) { toggleChildRequired(arrIndex); }
               else { updateNestedField(c, 'is_required', !c.is_required); }
             }}
-              className={`px-2 py-0.5 text-sm rounded cursor-pointer ${c.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+              className={`px-2 py-0.5 text-sm rounded cursor-pointer ${c.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)]' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)]'}`}>
               {c.is_required ? '必选' : '可选'}
             </button>
           </td>
           <td className="px-3 py-2 text-center text-sm">
             <div className="flex items-center justify-center gap-1 whitespace-nowrap">
-              <button onClick={() => {
-                setPickerParentId(c.child_id); setPickerParentIdx(idx); setCfgSearch(''); setPickerSelected([]);
+              <Button variant="link" size="xs" onClick={() => {
+                setPickerParentId(c.child_id); setPickerParentIdx(idx); setPickerSelected([]);
                 setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
-                setCfgResults([]);
                 setCfgPickerOpen(true);
-              }}
-                className="text-sm text-primary-600 hover:text-primary-800">＋子项</button>
-              <button onClick={() => {
+              }}>＋子项</Button>
+              <Button variant="danger" size="xs" onClick={() => {
                 if (isRoot) { setChildren(prev => prev.filter((_, j) => j !== arrIndex)); }
                 else { removeNestedChild(c); }
-              }}
-                className="text-sm text-red-500 hover:text-red-700">移除</button>
+              }}>移除</Button>
             </div>
           </td>
         </tr>
         {childRows && childRows.map((cc: any, j: number) => renderChildRow(cc, level + 1, `${idx}-${j}`))}
-        {loadingChild === idx && <tr><td colSpan={7} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingChild === idx && <tr><td colSpan={7} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
 
-  // 加载/搜索可选子构型项（exclude 规则与打开弹窗时一致；带请求竞态守卫）
-  const loadCfgItems = (search: string) => {
-    const reqId = ++cfgReqId.current;
-    setCfgSearching(true);
-    const params: any = { page: 1, page_size: 100 };
-    const excludeId = pickerParentId ?? item?.id;
-    if (item?.id && excludeId) params.exclude_ancestors_of = excludeId;
-    const kw = search.trim();
-    if (kw) params.search = kw;
-    configurationApi.list(params)
-      .then(r => { if (reqId === cfgReqId.current) setCfgResults(r.items || []); })
-      .catch(() => { if (reqId === cfgReqId.current) setCfgResults([]); })
-      .finally(() => { if (reqId === cfgReqId.current) setCfgSearching(false); });
-  };
-
-  // 选择子构型项弹窗：随输入实时刷新列表（防抖 250ms）；打开弹窗时也会触发首次加载
-  useEffect(() => {
-    if (!cfgPickerOpen) return;
-    setCfgSearching(true);
-    const t = setTimeout(() => loadCfgItems(cfgSearch), 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cfgPickerOpen, cfgSearch, pickerParentId]);
+  // 选择子构型项弹窗：数据拉取已内聚进 EntityPickerModal（fetchData），本组件不再维护 cfgResults/cfgSearch
 
   return (
     <>
@@ -417,25 +396,25 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
         {/* 基本信息 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">构型号 *</label>
-            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300" placeholder="如 CFG-001" />
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号 <span className="text-red-500">*</span></label>
+            <Input size="xs" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
+              className="placeholder:text-gray-300" placeholder="如 CFG-001" />
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">中文名称 *</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300" placeholder="如 A型机翼构型" />
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 <span className="text-red-500">*</span></label>
+            <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
           {item && (
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">创建人</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">创建人</label>
               <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
             </div>
           )}
           {isEdit && (
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2 md:col-span-4">
-              <label className="block text-xs text-gray-500 mb-0.5">创建者</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] col-span-2 md:col-span-4">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">创建者</label>
               <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
             </div>
           )}
@@ -444,11 +423,11 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {/* 自定义字段 */}
         {cfDefs.length > 0 && (
           <div className="border-t pt-4">
-            <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {cfDefs.map(def => (
-                <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <label className="block text-xs text-gray-500 mb-0.5">
+                <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">
                     {def.name}
                     {def.is_required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
@@ -466,62 +445,55 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {/* 关联零部件 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">关联零部件 ({parts.length})</h4>
-            <button type="button" onClick={() => setPickerOpen(true)}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">关联零部件</button>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联零部件 ({parts.length})</h4>
+            <Button size="sm" type="button" onClick={() => setPickerOpen(true)}>关联零部件</Button>
           </div>
           {parts.length === 0 ? (
-            <p className="text-xs text-gray-400">暂无关联零部件，点击"关联零部件"添加</p>
+            <p className="text-xs text-[var(--ui-text-tertiary)]">暂无关联零部件，点击"关联零部件"添加</p>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">名称</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">状态</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-16">用量</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-20">必选/可选</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-24">操作</th>
+                    <SortableTh className="text-left w-16">类型</SortableTh>
+                    <SortableTh sortKey="part_code" active={partsSortField === 'part_code'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left">件号</SortableTh>
+                    <SortableTh sortKey="part_name" active={partsSortField === 'part_name'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left">名称</SortableTh>
+                    <SortableTh sortKey="part_spec" active={partsSortField === 'part_spec'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left">规格型号</SortableTh>
+                    <SortableTh sortKey="part_version" active={partsSortField === 'part_version'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left w-14">版本</SortableTh>
+                    <SortableTh sortKey="part_status" active={partsSortField === 'part_status'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left w-16">状态</SortableTh>
+                    <SortableTh sortKey="quantity" active={partsSortField === 'quantity'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-center w-16">用量</SortableTh>
+                    <SortableTh sortKey="is_required" active={partsSortField === 'is_required'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-center w-20">必选/可选</SortableTh>
+                    <SortableTh className="text-center w-24">操作</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                   {parts.map((p, i) => (
-                     <tr key={i} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
+                   {sortedParts.map((p) => (
+                     <tr key={p.part_id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
                        <td className="px-3 py-1.5 text-xs">
-                         <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                           {p.part_type === 'assembly' ? '部件' : '零件'}
-                         </span>
+                         <Badge tone={p.part_type === 'assembly' ? 'blue' : 'gray'} label={p.part_type === 'assembly' ? '部件' : '零件'} />
                        </td>
                        <td className="px-3 py-1.5 text-xs font-mono">{p.part_code}</td>
                        <td className="px-3 py-1.5 text-xs">{p.part_name}</td>
-                       <td className="px-3 py-1.5 text-xs text-gray-500">{p.part_spec || '-'}</td>
+                       <td className="px-3 py-1.5 text-xs text-[var(--ui-text-secondary)]">{p.part_spec || '-'}</td>
                        <td className="px-3 py-1.5 text-xs">{p.part_version || '-'}</td>
                        <td className="px-3 py-1.5 text-xs">
-                         <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_status === 'draft' ? 'bg-blue-100 text-blue-800' : p.part_status === 'frozen' ? 'bg-orange-100 text-orange-800' : p.part_status === 'released' ? 'bg-green-100 text-green-800' : p.part_status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
-                           {p.part_status === 'draft' ? '草稿' : p.part_status === 'frozen' ? '冻结' : p.part_status === 'released' ? '发布' : p.part_status === 'obsolete' ? '作废' : '-'}
-                         </span>
+                         <Badge status={p.part_status} />
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
-                         <input type="number" min={1} value={p.quantity ?? 1}
-                           onChange={(e) => updatePartQuantity(i, parseInt(e.target.value) || 1)}
-                           className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                         <Input size="xs" type="number" min={1} value={p.quantity ?? 1}
+                           onChange={(e) => updatePartQuantity(p.part_id, parseInt(e.target.value) || 1)}
+                           className="!w-14 text-center" />
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
-                         <button onClick={() => togglePartRequired(i)}
-                           className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                         <button onClick={() => togglePartRequired(p.part_id)}
+                           className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)]' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)]'}`}>
                            {p.is_required ? '必选' : '可选'}
                          </button>
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                          <div className="flex gap-1 justify-center">
-                           <button onClick={() => setVersionSelectIdx(i)}
-                             className="text-xs text-blue-600 hover:text-blue-800">选择</button>
-                           <button onClick={() => setParts(prev => prev.filter((_, j) => j !== i))}
-                             className="text-xs text-red-500 hover:text-red-700">移除</button>
+                           <Button variant="link" size="xs" onClick={() => setVersionSelectPartId(p.part_id)}>选择</Button>
+                           <Button variant="danger" size="xs" onClick={() => setParts(prev => prev.filter(x => x.part_id !== p.part_id))}>移除</Button>
                          </div>
                        </td>
                      </tr>
@@ -535,169 +507,111 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {/* 子构型项 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">子构型项 ({children.length})</h4>
-            <button type="button" onClick={() => {
-              setPickerParentId(null); setCfgSearch(''); setPickerSelected([]);
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">子构型项 ({children.length})</h4>
+            <Button size="sm" type="button" onClick={() => {
+              setPickerParentId(null); setPickerSelected([]);
               setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
-              setCfgResults([]); setCfgPickerOpen(true);
-            }}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">添加子构型项</button>
+              setCfgPickerOpen(true);
+            }}>添加子构型项</Button>
           </div>
 
-          {/* 构型项选择器弹窗 */}
-          {cfgPickerOpen && (
-                <div className="fixed inset-0 bg-black/40 z-[70] flex items-center justify-center" onClick={() => { setCfgPickerOpen(false); setPickerParentId(null); }}>
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="px-4 py-3 border-b flex items-center justify-between">
-                  <h4 className="text-sm font-semibold">{pickerParentId ? '选择子构型项（添加至下级）' : '选择子构型项'}</h4>
-                  <button onClick={() => setCfgPickerOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+          {/* 构型项选择器弹窗（共享 EntityPickerModal，zIndex 走 MODAL_Z.picker） */}
+          <EntityPickerModal<any>
+            open={cfgPickerOpen}
+            title={pickerParentId ? '选择子构型项（添加至下级）' : '选择子构型项'}
+            onClose={() => { setCfgPickerOpen(false); setPickerParentId(null); }}
+            width="xl"
+            fetchData={async ({ search }) => {
+              const params: any = { page: 1, page_size: 100 };
+              const excludeId = pickerParentId ?? item?.id;
+              if (item?.id && excludeId) params.exclude_ancestors_of = excludeId;
+              const kw = search.trim();
+              if (kw) params.search = kw;
+              try {
+                const r = await configurationApi.list(params);
+                return (r.items || []).filter((x: any) =>
+                  !children.some(c => c.child_id === x.id) && x.id !== pickerParentId
+                );
+              } catch { return []; }
+            }}
+            getKey={(r) => r.id}
+            columns={[
+              { key: 'code', title: '构型号', width: '120px', sortable: true, render: (r) => <span className="font-medium text-xs">{r.code}</span> },
+              { key: 'name', title: '名称', sortable: true, render: (r) => <span className="text-xs">{r.name}</span> },
+              { key: 'spec', title: '规格型号', sortable: true, render: (r) => <span className="text-xs text-[var(--ui-text-tertiary)]">{r.spec || '-'}</span> },
+            ]}
+            selected={pickerSelected}
+            onSelectedChange={setPickerSelected}
+            onConfirm={async (items) => {
+              if (pickerParentId) {
+                // 向指定父级添加子项 → 即时 API
+                if (items.length > 0) {
+                  await configurationApi.addChildren(pickerParentId, items.map((s: any) => ({
+                    child_revision_id: s.id, is_required: true, quantity: 1,
+                  })));
+                  if (pickerParentIdx) markHasChildren(pickerParentIdx);
+                  refreshParentChildren(pickerParentId);
+                }
+              } else {
+                setChildren(prev => sortByCode([...prev, ...items.map((s: any) => ({
+                  child_id: s.id, child_code: s.code, child_name: s.name, child_remark: s.remark || '', quantity: 1, is_required: true,
+                  has_children: false,
+                }))]));
+              }
+              setCfgPickerOpen(false);
+              setPickerParentId(null); setPickerParentIdx(null);
+            }}
+            searchPlaceholder="搜索构型号/名称..."
+            confirmText="确认添加"
+            quickCreate={(
+              <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden mb-3">
+                <div className="flex items-center">
+                  <TreeToggle expanded={quickCreateOpen} onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }} size="sm" />
+                  <Button variant="ghost" size="sm" className="flex-1 !justify-start" onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}>
+                    快速新建构型项
+                  </Button>
                 </div>
-
-                {/* 已选子项 */}
-                <div className="border-b">
-                  <div className="bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">已选子项 ({pickerSelected.length})</div>
-                  {pickerSelected.length === 0 ? (
-                    <div className="px-4 py-4 text-center text-sm text-gray-400">请在下方列表中选择</div>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto">
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-gray-50 border-b"><tr>
-                          <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
-                          <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
-                          <th className="px-3 py-2 text-right text-xs text-gray-500 w-12"></th>
-                        </tr></thead>
-                        <tbody className="divide-y">
-                          {pickerSelected.map((s: any) => (
-                            <tr key={s.id} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 font-medium text-xs">{s.code}</td>
-                              <td className="px-3 py-2 text-xs">{s.name}</td>
-                              <td className="px-3 py-2 text-right">
-                                <button onClick={() => setPickerSelected(prev => prev.filter(x => x.id !== s.id))}
-                                  className="text-xs text-red-500 hover:text-red-700">移除</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                {quickCreateOpen && (
+                  <div className="px-4 py-3 border-t space-y-2 bg-[var(--ui-bg-subtle)]">
+                    <div className="flex gap-2">
+                      <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
+                        placeholder="构型号 *" className="flex-1" />
+                      <Input size="xs" value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
+                        placeholder="名称 *" className="flex-1" />
+                      <Button size="sm" className="whitespace-nowrap" onClick={async () => {
+                        if (!quickForm.code.trim() || !quickForm.name.trim()) return;
+                        setQuickCreating(true);
+                        try {
+                          const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim() });
+                          const newItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim() };
+                          setPickerSelected(prev => [...prev, newItem]);
+                          setQuickForm({ code: '', name: '' });
+                        } catch (e: any) {}
+                        finally { setQuickCreating(false); }
+                      }} disabled={quickCreating}>
+                        {quickCreating ? '创建中...' : '新建并添加'}
+                      </Button>
                     </div>
-                  )}
-                </div>
-
-                {/* 搜索 + 快速新建 + 候选列表 */}
-                <div className="px-4 flex-1 flex flex-col min-h-0">
-                  <div className="flex gap-2 pt-4 pb-3 items-center flex-shrink-0">
-                    <input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm" placeholder="搜索构型号/名称（实时）..." />
-                    {cfgSearching && <span className="text-xs text-gray-400 whitespace-nowrap">搜索中...</span>}
                   </div>
-
-                  {/* 快速新建构型项 */}
-                  <div className="border rounded-lg overflow-hidden mb-3 flex-shrink-0">
-                     <button onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
-                      <span className="text-xs">{quickCreateOpen ? '▼' : '▶'}</span>
-                      快速新建构型项
-                    </button>
-                    {quickCreateOpen && (
-                      <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
-                        <div className="flex gap-2">
-                          <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
-                            placeholder="构型号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                          <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
-                            placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                          <button onClick={async () => {
-                            if (!quickForm.code.trim() || !quickForm.name.trim()) return;
-                            setQuickCreating(true);
-                            try {
-                              const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim() });
-                              const newItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim() };
-                              setPickerSelected(prev => [...prev, newItem]);
-                              setQuickForm({ code: '', name: '' });
-                            } catch (e: any) {}
-                            finally { setQuickCreating(false); }
-                          }} disabled={quickCreating}
-                            className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
-                            {quickCreating ? '创建中...' : '新建并添加'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto border border-gray-200 rounded">
-                    {cfgResults.length === 0 ? (
-                      <div className="text-center py-8 text-sm text-gray-400">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
-                    ) : (
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-gray-50 border-b">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
-                            <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
-                            <th className="px-3 py-2 text-left text-xs text-gray-500">规格型号</th>
-                            <th className="px-3 py-2 text-center text-xs text-gray-500 w-20">操作</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {cfgResults.filter((r: any) => !children.some(c => c.child_id === r.id) && !pickerSelected.some(s => s.id === r.id) && r.id !== pickerParentId).map((r: any) => (
-                            <tr key={r.id} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 font-medium text-xs">{r.code}</td>
-                              <td className="px-3 py-2 text-xs">{r.name}</td>
-                              <td className="px-3 py-2 text-xs text-gray-400">{r.spec || '-'}</td>
-                              <td className="px-3 py-2 text-center">
-                                <button onClick={() => setPickerSelected(prev => [...prev, r])}
-                                  className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">添加</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                </div>
-
-                {/* 底部按钮 */}
-                <div className="px-4 py-3 border-t flex justify-end gap-2">
-                  <button onClick={() => { setCfgPickerOpen(false); setPickerParentId(null); }}
-                    className="px-4 py-2 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">取消</button>
-                  <button onClick={async () => {
-                    if (pickerParentId) {
-                      // 向指定父级添加子项 → 即时 API
-                      if (pickerSelected.length > 0) {
-                        await configurationApi.addChildren(pickerParentId, pickerSelected.map((s: any) => ({
-                          child_revision_id: s.id, is_required: true, quantity: 1,
-                        })));
-                        if (pickerParentIdx) markHasChildren(pickerParentIdx);
-                        refreshParentChildren(pickerParentId);
-                      }
-                    } else {
-                      setChildren(prev => sortByCode([...prev, ...pickerSelected.map((s: any) => ({
-                        child_id: s.id, child_code: s.code, child_name: s.name, child_remark: s.remark || '', quantity: 1, is_required: true,
-                        has_children: false,
-                      }))]));
-                    }
-                    setCfgPickerOpen(false);
-                    setPickerParentId(null); setPickerParentIdx(null);
-                  }}
-                    className="px-4 py-2 bg-primary-600 text-white rounded text-sm hover:bg-primary-700">确认添加 ({pickerSelected.length})</button>
-                </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          />
 
           {children.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">暂无子构型项，点击"添加子构型项"选择</p>
+            <p className="text-sm text-[var(--ui-text-tertiary)] py-2">暂无子构型项，点击"添加子构型项"选择</p>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">备注</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">数量</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">必选/可选</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-28">操作</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">层级</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">构型号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">备注</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">数量</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-24">必选/可选</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-28">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -715,11 +629,10 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
         </div>
         <div className="flex-shrink-0 flex justify-end gap-2 pt-2 border-t">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm">取消</button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50">
+          <Button variant="secondary" onClick={onClose}>取消</Button>
+          <Button onClick={handleSubmit} disabled={saving}>
             {saving ? '保存中...' : '保存'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -752,25 +665,25 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       />
 
       {/* 版本选择器 */}
-      {versionSelectIdx !== null && parts[versionSelectIdx] && (
+      {versionSelectPartId && (
         <VersionSelectModal
-          open={versionSelectIdx !== null}
+          open={!!versionSelectPartId}
           entityType="part"
-          entityId={parts[versionSelectIdx].part_id}
-          entityName={parts[versionSelectIdx].part_name}
-          currentVersionId={parts[versionSelectIdx].revision_id || parts[versionSelectIdx].part_id}
+          entityId={versionSelectPartId}
+          entityName={parts.find(p => p.part_id === versionSelectPartId)?.part_name || ''}
+          currentVersionId={parts.find(p => p.part_id === versionSelectPartId)?.revision_id || versionSelectPartId}
           onSelect={(versionId: string) => {
             partsApi.getRevision(versionId).then(r => {
-              setParts(prev => prev.map((p, i) => i === versionSelectIdx ? {
+              setParts(prev => prev.map(p => p.part_id === versionSelectPartId ? {
                 ...p,
                 revision_id: r.id,
                 part_version: r.version || '',
                 part_status: r.status || '',
               } : p));
             }).catch(() => {});
-            setVersionSelectIdx(null);
+            setVersionSelectPartId(null);
           }}
-          onClose={() => setVersionSelectIdx(null)}
+          onClose={() => setVersionSelectPartId(null)}
         />
       )}
     </Modal>

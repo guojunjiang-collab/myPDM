@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { bomApi } from '../../services/api';
 import type { BOMTraceItem } from '../../types';
-import { buildTraceTree, flattenTraceTree, getStatusLabel } from './helpers';
+import { buildTraceTree, flattenTraceTree } from './helpers';
 import type { TraceTreeNode } from './types';
+import Badge from '../../components/ui/Badge';
+import TreeToggle from '../../components/ui/TreeToggle';
 
 interface Props {
   revisionId: string;
@@ -10,16 +12,6 @@ interface Props {
   onViewEntity: (masterId: string, revisionId?: string) => void;
   onStateChange?: (state: { loading: boolean; error: boolean; empty: boolean }) => void;
 }
-
-const statusCls = (s: string) => {
-  const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800',
-    frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800',
-    obsolete: 'bg-red-100 text-red-800',
-  };
-  return map[s] || 'bg-gray-100 text-gray-800';
-};
 
 export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onStateChange }: Props) {
   const [traceResult, setTraceResult] = useState<BOMTraceItem[]>([]);
@@ -72,7 +64,7 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
 
   if (loading) {
     return (
-      <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-gray-200">
+      <div className="text-center py-8 text-[var(--ui-text-tertiary)] bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)]">
         反查中...
       </div>
     );
@@ -92,51 +84,47 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
 
   if (searched && traceResult.length === 0) {
     return (
-      <div className="text-gray-400 text-sm py-2">暂无引用</div>
+      <div className="text-[var(--ui-text-tertiary)] text-sm py-2">暂无引用</div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-        <span className="text-sm text-gray-600">
+    <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)]">
+      <div className="p-3 border-b border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] flex items-center justify-between">
+        <span className="text-sm text-[var(--ui-text-secondary)]">
           找到 {traceResult.length} 个关联节点（{traceTree.length} 个顶层）
         </span>
       </div>
       <div className="overflow-auto max-h-[calc(100vh-360px)]">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b sticky top-0">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
             <tr>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">类型</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">版本</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">层级</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">类型</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">版本</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">用量</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {root && (
               <tr
-                className="bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                className="bg-[var(--ui-bg-subtle)] hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                 onClick={() => onViewEntity(root.masterId, root.revisionId)}
               >
                 <td className="px-3 py-2 whitespace-nowrap text-left">
-                  <span className="text-xs text-gray-400">0</span>
+                  <span className="text-xs text-[var(--ui-text-tertiary)]">0</span>
                 </td>
                 <td className="px-3 py-2">
-                  <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">零部件</span>
+                  <Badge tone="gray" label="零部件" />
                 </td>
                 <td className="px-3 py-2 font-medium">{root.code}</td>
                 <td className="px-3 py-2">{root.name}</td>
                 <td className="px-3 py-2">{root.version || '-'}</td>
                 <td className="px-3 py-2">
-                  {root.status ? (
-                    <span className={`px-1.5 py-0.5 text-xs rounded ${statusCls(root.status)}`}>
-                      {getStatusLabel(root.status)}
-                    </span>
-                  ) : '-'}
+                  {root.status ? <Badge status={root.status} /> : '-'}
                 </td>
                 <td className="px-3 py-2">-</td>
               </tr>
@@ -148,7 +136,7 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
               return (
                 <tr
                   key={`${item.bom_item_id}-${idx}`}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                   onClick={() => {
                     if (!parent) return;
                     onViewEntity(parent.master_id || parent.id, parent.revision_id);
@@ -156,29 +144,22 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                 >
                   <td className="px-3 py-2 whitespace-nowrap text-left">
                     <span className="inline-flex items-center gap-0.5">
-                      <span className="text-xs text-gray-400">{'-'.repeat(item.level)}{item.level}</span>
+                      <span className="text-xs text-[var(--ui-text-tertiary)]">{'-'.repeat(item.level)}{item.level}</span>
                       {hasChildren ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleTraceNode(item.bom_item_id); }}
-                          className="w-4 h-4 inline-flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded"
-                        >
-                          {node.expanded ? '▼' : '▶'}
-                        </button>
+                        <TreeToggle expanded={node.expanded} onClick={() => toggleTraceNode(item.bom_item_id)} size="sm" />
                       ) : (
-                        <span className="w-4 inline-block" />
+                        <TreeToggle leaf size="sm" />
                       )}
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">零部件</span>
+                    <Badge tone="gray" label="零部件" />
                   </td>
                   <td className="px-3 py-2 font-medium">{parent?.code || '-'}</td>
                   <td className="px-3 py-2">{parent?.name || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{parent?.version || '-'}</td>
+                  <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{parent?.version || '-'}</td>
                   <td className="px-3 py-2">
-                    <span className={`px-1.5 py-0.5 text-xs rounded ${statusCls(parent?.status || '')}`}>
-                      {getStatusLabel(parent?.status || '-')}
-                    </span>
+                    <Badge status={parent?.status} />
                   </td>
                   <td className="px-3 py-2">{item.quantity}</td>
                 </tr>

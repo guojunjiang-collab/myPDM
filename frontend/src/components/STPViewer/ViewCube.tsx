@@ -53,7 +53,7 @@ export function ViewCube() {
           <div
             key={f.key}
             onClick={() => setViewTarget(f.key)}
-            className="absolute inset-0 flex items-center justify-center cursor-pointer border border-gray-300 text-xs font-medium bg-white/90 text-gray-600 hover:bg-gray-100"
+            className="absolute inset-0 flex items-center justify-center cursor-pointer border border-gray-300 text-xs font-medium bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]"
             style={{ transform: f.css, backfaceVisibility: 'hidden' }}
           >
             {f.label}

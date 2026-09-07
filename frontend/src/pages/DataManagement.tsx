@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import { isAdmin } from '../stores/auth';
 import { ConfirmModal } from '../components/Modal';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import SortableTh from '../components/ui/SortableTh';
+import { useTableSort } from '../hooks/useTableSort';
 
 interface TableStats {
   count: number;
@@ -63,7 +67,7 @@ export default function DataManagement() {
 
   if (!isAdmin()) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
+      <div className="flex items-center justify-center h-64 text-[var(--ui-text-tertiary)]">
         仅管理员可访问数据管理功能
       </div>
     );
@@ -120,12 +124,25 @@ export default function DataManagement() {
     ? Object.values(stats).reduce((sum, s) => sum + s.count, 0)
     : 0;
 
+  // 客户端排序（统计行转数组）
+  const statRows = useMemo(() => {
+    if (!stats) return [];
+    return Object.entries(stats).map(([table, s]) => ({
+      table,
+      label: TABLE_LABELS[table] || table,
+      count: s.count,
+      earliest: s.earliest ? new Date(s.earliest).getTime() : null,
+      latest: s.latest ? new Date(s.latest).getTime() : null,
+    }));
+  }, [stats]);
+  const { sortedData: sortedStatRows, sortField, sortDirection, handleSort } = useTableSort<Record<string, any>>(statRows);
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h2 className="text-xl font-semibold mb-6">数据管理</h2>
 
       {loading && (
-        <div className="text-gray-400 text-center py-8">加载中...</div>
+        <div className="text-[var(--ui-text-tertiary)] text-center py-8">加载中...</div>
       )}
 
       {error && (
@@ -142,28 +159,28 @@ export default function DataManagement() {
           </div>
 
           {/* 分表统计 */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
+          <div className="bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg overflow-hidden mb-6">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">表名</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500">数量</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">最早删除时间</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">最近删除时间</th>
+                  <SortableTh sortKey="label" active={sortField === 'label'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">表名</SortableTh>
+                  <SortableTh sortKey="count" active={sortField === 'count'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-right">数量</SortableTh>
+                  <SortableTh sortKey="earliest" active={sortField === 'earliest'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">最早删除时间</SortableTh>
+                  <SortableTh sortKey="latest" active={sortField === 'latest'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">最近删除时间</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(stats).map(([table, s]) => (
-                  <tr key={table} className="border-b last:border-b-0 hover:bg-gray-50">
-                    <td className="px-4 py-3">{TABLE_LABELS[table] || table}</td>
-                    <td className={`px-4 py-3 text-right ${s.count > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>
-                      {s.count}
+                {sortedStatRows.map((row) => (
+                  <tr key={row.table} className="border-b last:border-b-0 hover:bg-[var(--ui-bg-hover)]">
+                    <td className="px-4 py-3">{row.label}</td>
+                    <td className={`px-4 py-3 text-right ${row.count > 0 ? 'text-orange-600 font-medium' : 'text-[var(--ui-text-tertiary)]'}`}>
+                      {row.count}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {s.earliest ? new Date(s.earliest).toLocaleString('zh-CN') : '--'}
+                    <td className="px-4 py-3 text-[var(--ui-text-secondary)]">
+                      {row.earliest ? new Date(row.earliest).toLocaleString('zh-CN') : '--'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {s.latest ? new Date(s.latest).toLocaleString('zh-CN') : '--'}
+                    <td className="px-4 py-3 text-[var(--ui-text-secondary)]">
+                      {row.latest ? new Date(row.latest).toLocaleString('zh-CN') : '--'}
                     </td>
                   </tr>
                 ))}
@@ -172,15 +189,15 @@ export default function DataManagement() {
           </div>
 
           {/* 清理操作区 */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg p-6">
             <h3 className="font-medium mb-4">清理软删除数据</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               选择要清理的表和日期范围。清理操作不可逆，建议先备份数据库。
             </p>
 
             {/* 表选择 */}
             <div className="mb-4">
-              <div className="text-sm text-gray-600 mb-2">选择要清理的表:</div>
+              <div className="text-sm text-[var(--ui-text-secondary)] mb-2">选择要清理的表:</div>
               <div className="flex flex-wrap gap-2">
                 {Object.keys(TABLE_LABELS).map(table => (
                   <label
@@ -188,7 +205,7 @@ export default function DataManagement() {
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm cursor-pointer border transition-colors ${
                       selectedTables.has(table)
                         ? 'border-blue-400 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'
                     }`}
                   >
                     <input
@@ -205,29 +222,28 @@ export default function DataManagement() {
 
             {/* 日期选择 */}
             <div className="mb-4">
-              <div className="text-sm text-gray-600 mb-2">清理此日期之前的数据（可选）:</div>
+              <div className="text-sm text-[var(--ui-text-secondary)] mb-2">清理此日期之前的数据（可选）:</div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <button onClick={() => setPresetDate(null)} className={`px-3 py-1 rounded text-xs border transition-colors ${!beforeDate ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                <Button size="sm" active={!beforeDate} onClick={() => setPresetDate(null)}>
                   全部清理
-                </button>
-                <button onClick={() => setPresetDate(30)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(30) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                </Button>
+                <Button size="sm" active={beforeDate === getPresetDateStr(30)} onClick={() => setPresetDate(30)}>
                   清理30天前
-                </button>
-                <button onClick={() => setPresetDate(90)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(90) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                </Button>
+                <Button size="sm" active={beforeDate === getPresetDateStr(90)} onClick={() => setPresetDate(90)}>
                   清理90天前
-                </button>
-                <button onClick={() => setPresetDate(180)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(180) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                </Button>
+                <Button size="sm" active={beforeDate === getPresetDateStr(180)} onClick={() => setPresetDate(180)}>
                   清理180天前
-                </button>
+                </Button>
               </div>
-              <input
+              <Input
                 type="date"
                 value={beforeDate}
                 onChange={(e) => setBeforeDate(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-1.5 text-sm"
               />
               {!beforeDate && (
-                <span className="text-xs text-gray-400 ml-2">留空则清理所有软删除数据</span>
+                <span className="text-xs text-[var(--ui-text-tertiary)] ml-2">留空则清理所有软删除数据</span>
               )}
             </div>
 
@@ -239,13 +255,13 @@ export default function DataManagement() {
               </div>
             )}
 
-            <button
+            <Button
+              variant="danger"
               onClick={() => setPurgeConfirmOpen(true)}
               disabled={selectedTables.size === 0 || purging}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-40 text-sm"
             >
               执行清理
-            </button>
+            </Button>
           </div>
 
           <ConfirmModal

@@ -9,7 +9,7 @@ import { exportDeliverables } from '../../services/deliverableExport';
 import { toast } from '../../components/Toast';
 import type { DeliverableItem, DeliverableSummary, DeliverableTaskRef } from '../../types/project';
 import {
-  DELIVERABLE_TABS, filterItems, statusOptions, statusLabel, taskTooltip,
+  DELIVERABLE_TABS, filterItems, statusOptions, taskTooltip, compareVersion,
   type DeliverableTabKey, type DeliverableTabDef,
 } from './deliverableUtils';
 import PartDetailModal from '../../components/PartDetailModal';
@@ -17,6 +17,13 @@ import DocumentDetailModal from '../../components/DocumentDetailModal';
 import ConfigItemDetailModal from '../../components/Configuration/ConfigItemDetailModal';
 import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
 import { ECODetailModal } from '../../components/ECO/ECODetailModal';
+import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
+import type { BadgeDomain } from '../../constants/badges';
 
 interface Props {
   open: boolean;
@@ -41,34 +48,29 @@ function TaskCell({ tasks, onOpenTask }: {
 }) {
   const [listOpen, setListOpen] = useState(false);
 
-  if (tasks.length === 0) return <span className="text-gray-400">—</span>;
+  if (tasks.length === 0) return <span className="text-[var(--ui-text-tertiary)]">—</span>;
 
   return (
     <span className="relative inline-flex items-center gap-1" title={taskTooltip(tasks)}>
-      <button
+      <Button variant="link" size="xs"
         onClick={(e) => { e.stopPropagation(); onOpenTask(tasks[0].id); }}
-        className="text-primary-600 hover:text-primary-800 truncate max-w-[160px]"
-      >
+        className="truncate max-w-[160px]">
         {tasks[0].code} {tasks[0].name}
-      </button>
+      </Button>
       {tasks.length > 1 && (
         <>
-          <button
-            onClick={(e) => { e.stopPropagation(); setListOpen((v) => !v); }}
-            className="px-1 rounded bg-gray-100 text-gray-500 text-xs hover:bg-gray-200"
-          >
+          <Button variant="ghost" size="xs"
+            onClick={(e) => { e.stopPropagation(); setListOpen((v) => !v); }}>
             +{tasks.length - 1}
-          </button>
+          </Button>
           {listOpen && (
-            <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]">
+            <div className="absolute right-0 top-full mt-1 z-10 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg py-1 min-w-[180px]">
               {tasks.slice(1).map((t) => (
-                <button
-                  key={t.id}
+                <Button variant="ghost" size="sm" key={t.id}
                   onClick={(e) => { e.stopPropagation(); setListOpen(false); onOpenTask(t.id); }}
-                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 truncate"
-                >
+                  className="w-full !justify-start rounded-none truncate">
                   {t.code} {t.name}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -114,6 +116,25 @@ export default function DeliverableModal({
   const items = useMemo(() => filterItems(rawItems, search, status), [rawItems, search, status]);
   const options = useMemo(() => statusOptions(rawItems), [rawItems]);
 
+  // 点击表头排序：版本列用 A→B→ZZ 序列比较器；来源任务列按首个任务编号排
+  const { sortedData: sortedItems, sortField, sortDirection, handleSort } = useTableSort<DeliverableItem>(
+    items,
+    {
+      fieldComparators: { version: (a: unknown, b: unknown) => compareVersion(String(a), String(b)) },
+      getValue: (i, f) => (f === 'tasks' ? (i.tasks[0]?.code ?? '') : i[f]),
+    }
+  );
+  const sortProps = (key: keyof DeliverableItem) => ({
+    sortKey: String(key),
+    active: sortField === key,
+    direction: sortDirection,
+    onSort: (k: string) => handleSort(k as keyof DeliverableItem),
+  });
+
+  /** 状态徽标语义域：变更按 ECR/ECO 区分，其余走数据生命周期 */
+  const statusDomain = (t: DeliverableTabKey, i: DeliverableItem): BadgeDomain =>
+    t === 'changes' ? (i.extra === 'ECO' ? 'eco' : 'ecr') : 'part';
+
   const colSpan = 5 + (tabDef.showVersion ? 1 : 0) + (tabDef.showExtra ? 1 : 0);
 
   const handleExport = () => {
@@ -125,15 +146,14 @@ export default function DeliverableModal({
     <>
       <Modal open={open} title="交付物汇总" onClose={onClose} width="3xl" height="75vh"
         headerAction={
-          <button onClick={handleExport} disabled={!summary}
-            title="导出全部四类，不受当前 TAB 与筛选影响"
-            className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          <Button variant="primary" size="sm" onClick={handleExport} disabled={!summary}
+            title="导出全部四类，不受当前 TAB 与筛选影响">
             导出 Excel
-          </button>
+          </Button>
         }>
       <div className="flex flex-col h-full">
       {/* TAB 条 */}
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-3 shrink-0">
+      <div className="flex items-center gap-1 border-b border-[var(--ui-border)] mb-3 shrink-0">
         {DELIVERABLE_TABS.map((t) => (
           <button
             key={t.key}
@@ -141,11 +161,11 @@ export default function DeliverableModal({
             className={`px-4 py-2 text-sm border-b-2 -mb-px ${
               tab === t.key
                 ? 'border-primary-600 text-primary-600 font-medium'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
             }`}
           >
             {t.label}
-            <span className="ml-1.5 text-xs text-gray-400">
+            <span className="ml-1.5 text-xs text-[var(--ui-text-tertiary)]">
               {summary ? summary.counts[t.key] : 0}
             </span>
           </button>
@@ -154,67 +174,71 @@ export default function DeliverableModal({
 
       {/* 工具栏 */}
       <div className="flex items-center gap-2 mb-3 shrink-0">
-        <input
+        <Input
           type="text"
           placeholder="搜索编号/名称..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-44 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="flex-1 min-w-0"
         />
-        <select
+        <Select
+          className="!w-auto"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
         >
           <option value="">全部状态</option>
           {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        </Select>
         <div className="flex-1" />
-        <span className="text-sm text-gray-400">共 {items.length} 条</span>
+        <span className="text-sm text-[var(--ui-text-tertiary)]">共 {items.length} 条</span>
       </div>
 
       {/* 表格 */}
-      <div className="border border-gray-200 rounded-lg flex-1 min-h-0 overflow-y-auto">
+      <div className="border border-[var(--ui-border)] rounded-lg flex-1 min-h-0 overflow-y-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-28">编号</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">{tabDef.nameLabel}</th>
+              <SortableTh {...sortProps('code')} className="w-28">编号</SortableTh>
+              <SortableTh {...sortProps('name')}>{tabDef.nameLabel}</SortableTh>
               {tabDef.showVersion && (
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-16">版本</th>
+                <SortableTh {...sortProps('version')} className="w-16">版本</SortableTh>
               )}
               {tabDef.showExtra && (
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-20">{tabDef.extraLabel}</th>
+                <SortableTh {...sortProps('extra')} className="w-20">{tabDef.extraLabel}</SortableTh>
               )}
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-18">状态</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-18">创建人</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">来源任务</th>
+              <SortableTh {...sortProps('status')} className="w-18">状态</SortableTh>
+              <SortableTh {...sortProps('creator_name')} className="w-18">创建人</SortableTh>
+              <SortableTh {...sortProps('tasks')}>来源任务</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-gray-500">加载中...</td></tr>
-            ) : items.length === 0 ? (
-              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-gray-500">{EMPTY_HINT[tab]}</td></tr>
+              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
+            ) : sortedItems.length === 0 ? (
+              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-[var(--ui-text-secondary)]">{EMPTY_HINT[tab]}</td></tr>
             ) : (
-              items.map((i) => (
+              sortedItems.map((i) => (
                 <tr key={i.entity_id} onClick={() => setDetail(i)}
-                    className="hover:bg-gray-50 cursor-pointer">
+                    className="hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                   <td className="px-3 py-2 text-sm font-medium whitespace-nowrap">{i.code}</td>
                   <td className="px-3 py-2 text-sm">{i.name}</td>
                   {tabDef.showVersion && (
-                    <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{i.version || '—'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">{i.version || '—'}</td>
                   )}
                   {tabDef.showExtra && (
-                    <td className="px-3 py-2 text-sm text-gray-600">{i.extra || '—'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
+                      {tab === 'parts' && i.extra ? (
+                        <Badge size="xs" status={i.extra} domain="partType" />
+                      ) : (
+                        i.extra || '—'
+                      )}
+                    </td>
                   )}
                   <td className="px-3 py-2 text-sm whitespace-nowrap">
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
-                      {statusLabel(i.status)}
-                    </span>
+                    <Badge size="xs" status={i.status} domain={statusDomain(tab, i)} />
                   </td>
-                  <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{i.creator_name || '—'}</td>
-                  <td className="px-3 py-2 text-sm text-gray-600">
+                  <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">{i.creator_name || '—'}</td>
+                  <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
                     <TaskCell tasks={i.tasks} onOpenTask={onOpenTask} />
                   </td>
                 </tr>

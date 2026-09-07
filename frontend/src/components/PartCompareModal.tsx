@@ -4,10 +4,17 @@ import { Modal } from './Modal';
 import PartDetailModal from './PartDetailModal';
 import { partsApi, bomApi } from '../services/api';
 import type { PartListItem, BOMCompareNode, BOMCompareResponse } from '../types';
+import Button from './ui/Button';
+import Input from './ui/Input';
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** 预选左右版本（PartRevision id + 展示 item），传入时打开即自动对比（PartDetailModal 版本 Tab 使用） */
+  initialLeftId?: string;
+  initialRightId?: string;
+  initialLeftItem?: PartListItem;
+  initialRightItem?: PartListItem;
 }
 
 const STATUS_LABEL: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
@@ -40,8 +47,8 @@ function PropertyCompareTable({ left, right, onlyDiff }: { left: any; right: any
   return (
     <div className="flex-1 min-h-0 overflow-auto">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 sticky top-0 z-10">
-          <tr className="text-xs font-medium text-gray-600 border-b">
+        <thead className="bg-[var(--ui-bg-subtle)] sticky top-0 z-10">
+          <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
             <th className="px-3 py-2 text-left w-24">字段</th>
             <th className="px-3 py-2 text-left">左值</th>
             <th className="px-3 py-2 text-left">右值</th>
@@ -54,7 +61,7 @@ function PropertyCompareTable({ left, right, onlyDiff }: { left: any; right: any
             const changed = lvs !== rvs;
             return (
               <tr key={i} className={changed ? 'bg-yellow-50' : ''}>
-                <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.label}</td>
+                <td className="px-3 py-1.5 text-[var(--ui-text-secondary)] whitespace-nowrap">{r.label}</td>
                 <td className="px-3 py-1.5">{lvs || '-'}</td>
                 <td className={`px-3 py-1.5 ${changed ? 'font-semibold text-red-600' : ''}`}>{rvs || '-'}</td>
               </tr>
@@ -142,36 +149,35 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <div className="relative">
-        <input
+        <Input
           type="text"
-          value={open ? q : selected ? `${selected.code} - ${selected.name}` : ''}
+          value={open ? q : selected ? `${selected.code}_${selected.name}_${selected.version}` : ''}
           placeholder="输入件号或名称搜索..."
           onFocus={() => { setOpen(true); setQ(''); }}
           onChange={(e) => doSearch(e.target.value)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
         />
         {open && (
-          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+          <div className="absolute z-20 w-full mt-1 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg max-h-56 overflow-auto">
             {searching && (
-              <div className="px-3 py-2 text-sm text-gray-400">搜索中...</div>
+              <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">搜索中...</div>
             )}
             {!searching && q.trim() && results.length === 0 && (
-              <div className="px-3 py-2 text-sm text-gray-400">无匹配结果</div>
+              <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
             )}
             {!searching && !q.trim() && (
-              <div className="px-3 py-2 text-sm text-gray-400">输入关键词搜索</div>
+              <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">输入关键词搜索</div>
             )}
             {!searching && results.map((o) => (
               <button
                 key={o.revision_id}
                 type="button"
                 onMouseDown={() => { onPick(o.revision_id, o); setSelected(o); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-[var(--ui-border)] last:border-b-0 flex items-center gap-2"
               >
                 <span className="font-medium">{o.code}</span>
-                <span className="text-gray-500 truncate">{o.name}</span>
-                <span className="ml-auto text-gray-400 text-xs">{o.version}</span>
+                <span className="text-[var(--ui-text-secondary)] truncate">{o.name}</span>
+                <span className="ml-auto text-[var(--ui-text-tertiary)] text-xs">{o.version}</span>
               </button>
             ))}
           </div>
@@ -181,7 +187,14 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
   );
 }
 
-export default function PartCompareModal({ open, onClose }: Props) {
+export default function PartCompareModal({
+  open,
+  onClose,
+  initialLeftId,
+  initialRightId,
+  initialLeftItem,
+  initialRightItem,
+}: Props) {
   const [leftId, setLeftId] = useState<string | null>(null);
   const [rightId, setRightId] = useState<string | null>(null);
   const [leftItem, setLeftItem] = useState<PartListItem | null>(null);
@@ -195,13 +208,42 @@ export default function PartCompareModal({ open, onClose }: Props) {
   const [onlyDiff, setOnlyDiff] = useState(false);
   const [detail, setDetail] = useState<{ masterId: string; revisionId: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'property' | 'bom'>('property');
+  const autoStartedRef = useRef(false);
 
+  // 打开时初始化：有预选（版本 Tab BOM 对比）→ 直接设置左右并自动对比；否则重置为空
   useEffect(() => {
     if (!open) return;
-    setLeftId(null); setRightId(null); setLeftItem(null); setRightItem(null);
-    setLockedType(null);
+    autoStartedRef.current = false;
     setResult(null); setError(''); setOnlyDiff(false); setActiveTab('property'); setResetKey(0);
-  }, [open]);
+    if (initialLeftId && initialRightId) {
+      setLeftId(initialLeftId);
+      setRightId(initialRightId);
+      setLeftItem(initialLeftItem ?? null);
+      setRightItem(initialRightItem ?? null);
+      setLockedType(initialLeftItem?.type ?? null);
+      // 自动触发对比（state 更新后执行；用 timeout 保证左右 state 已写入）
+      setTimeout(() => {
+        setLoading(true); setError('');
+        bomApi
+          .compare(initialLeftId, initialRightId)
+          .then((res) => {
+            setResult(res.data as BOMCompareResponse);
+            setExpanded(new Set(['ROOT']));
+          })
+          .catch((err) => {
+            const msg = (err as AxiosError<{ detail: string }>)?.response?.data?.detail || '对比失败，请重试';
+            setError(msg);
+            setResult(null);
+          })
+          .finally(() => setLoading(false));
+      }, 0);
+    } else {
+      setLeftId(null); setRightId(null); setLeftItem(null); setRightItem(null);
+      setLockedType(null);
+    }
+    // 预选参数变化视为新的对比请求
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialLeftId, initialRightId]);
 
   /** 服务端搜索，按 lockedType 过滤 */
   const handleSearch = async (query: string, filterType: string | null): Promise<PartListItem[]> => {
@@ -318,7 +360,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
     if (!result) return null;
     const s = result.summary;
     return (
-      <div className="flex flex-wrap gap-4 mb-3 p-3 bg-gray-50 rounded-lg border text-sm">
+      <div className="flex flex-wrap gap-4 mb-3 p-3 bg-[var(--ui-bg-subtle)] rounded-lg border text-sm">
         <span>
           新增 <span className="text-green-600 font-medium">{s.added}</span>　
           删除 <span className="text-red-600 font-medium">{s.deleted}</span>　
@@ -337,36 +379,36 @@ export default function PartCompareModal({ open, onClose }: Props) {
         <div className="flex flex-col h-full space-y-4">
           <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-end">
             <PartPicker key={`left-${resetKey}`} label="左零部件" valueId={leftId} onPick={pickLeft} onSearch={handleSearch} filterType={lockedType} />
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => { setLeftId(null); setRightId(null); setLeftItem(null); setRightItem(null); setLockedType(null); setResetKey(k => k + 1); }}
               disabled={!leftId && !rightId}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-30 mb-1"
+              className="mb-1"
               title="清空两侧已选零部件"
             >
               重置
-            </button>
+            </Button>
             <PartPicker key={`right-${resetKey}`} label="右零部件" valueId={rightId} onPick={pickRight} onSearch={handleSearch} filterType={lockedType} />
           </div>
           {lockedType && (
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-[var(--ui-text-secondary)]">
               已锁定：<span className="font-medium">{lockedType === 'assembly' ? '部件' : '零件'}对比</span>
             </div>
           )}
           <div className="flex items-center gap-3">
-            <button onClick={handleCompare} disabled={!leftId || !rightId || loading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm">
+            <Button onClick={handleCompare} disabled={!leftId || !rightId || loading}>
               {loading ? '对比中...' : '开始对比'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => window.open(`/stp-viewer?compare-left=${leftId}&compare-right=${rightId}`, '_blank')}
               disabled={!leftId || !rightId}
               title="在新标签页中叠加对比两个零部件的 3D 模型"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
             >
               🧊 3D对比
-            </button>
+            </Button>
             {result && (
-              <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer select-none">
+              <label className="flex items-center gap-1 text-sm text-[var(--ui-text-secondary)] cursor-pointer select-none">
                 <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} />
                 仅显示差异
               </label>
@@ -377,9 +419,9 @@ export default function PartCompareModal({ open, onClose }: Props) {
 
           {result && (
             <div className="border rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
-              <div className="flex items-center gap-1 border-b bg-gray-50 px-1">
-                <button onClick={() => setActiveTab('property')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'property' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>属性对比</button>
-                <button onClick={() => setActiveTab('bom')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'bom' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>BOM树对比</button>
+              <div className="flex items-center gap-1 border-b bg-[var(--ui-bg-subtle)] px-1">
+                <button onClick={() => setActiveTab('property')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'property' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'}`}>属性对比</button>
+                <button onClick={() => setActiveTab('bom')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'bom' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'}`}>BOM树对比</button>
               </div>
 
               {activeTab === 'property' ? (
@@ -387,7 +429,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
               ) : (
                 <>
                   {result.comparison.length === 0 && !identical && (
-                    <div className="text-sm text-gray-500 text-center py-6">两侧 BOM 均为空</div>
+                    <div className="text-sm text-[var(--ui-text-secondary)] text-center py-6">两侧 BOM 均为空</div>
                   )}
                   {identical && (
                     <div className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded">两侧 BOM 一致</div>
@@ -412,15 +454,15 @@ export default function PartCompareModal({ open, onClose }: Props) {
                     <col className="w-px" />
                     <col className="w-40" />
                   </colgroup>
-                  <thead className="sticky top-0 bg-gray-50 z-10">
-                    <tr className="text-xs font-medium text-gray-600 border-b">
-                      <th colSpan={5} className="px-2 py-2 text-left border-r border-gray-200">左 BOM</th>
+                  <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] z-10">
+                    <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
+                      <th colSpan={5} className="px-2 py-2 text-left border-r border-[var(--ui-border)]">左 BOM</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th colSpan={5} className="px-2 py-2 text-left">右 BOM</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-2 text-left">变更</th>
                     </tr>
-                    <tr className="text-xs font-medium text-gray-500 border-b">
+                    <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
                       <th className="px-2 py-1 text-left">件号</th>
                       <th className="px-2 py-1 text-left">名称</th>
                       <th className="px-2 py-1 text-center">版本</th>
@@ -447,11 +489,11 @@ export default function PartCompareModal({ open, onClose }: Props) {
                       );
                       const isExpanded = expanded.has(n.key);
                       // depth = n.level + 1，ROOT 为 0，直接子项为 1，以此类推
-                      // 对齐 CompareTreePanel：paddingLeft = 8 + depth*12，按钮中心 = 16 + depth*12
+                      // 对齐 CompareTreePanel：paddingLeft = 8 + depth*var(--ui-tree-indent)，按钮中心 = 16 + depth*var(--ui-tree-indent)
                       const depth = n.level + 1;
-                      const indent = 8 + depth * 12;
+                      const indent = `calc(8px + ${depth} * var(--ui-tree-indent))`;
                       return (
-                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
+                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-[var(--ui-border)] cursor-pointer hover:brightness-95`}
                           onClick={() => {
                             const side = n.right || n.left;
                             if (side?.child_master_id && side?.child_revision_id) {
@@ -467,13 +509,13 @@ export default function PartCompareModal({ open, onClose }: Props) {
                               <span
                                 key={k}
                                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                                style={{ left: 16 + k * 12 }}
+                                style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
                               />
                             ))}
                             <span className="inline-flex items-center gap-1">
                               {hasChildren ? (
                                 <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
-                                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-gray-200/60"
                                   title={isExpanded ? '折叠' : '展开'}>
                                   <CompareChevron expanded={isExpanded} />
                                 </button>
@@ -484,9 +526,9 @@ export default function PartCompareModal({ open, onClose }: Props) {
                             </span>
                           </td>
                           <td className="px-2 py-2 text-xs text-gray-700 truncate max-w-[200px]" title={l?.detail.name || ''}>{l?.detail.name || '-'}</td>
-                          <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.detail.version || '-'}</td>
-                          <td className="px-2 py-2 text-xs text-center text-gray-500">{statusLabel(l?.detail.status)}</td>
-                          <td className="px-2 py-2 text-xs text-center text-gray-500">{n.key === 'ROOT' ? '-' : (l?.quantity ?? '-')}</td>
+                          <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{l?.detail.version || '-'}</td>
+                          <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{statusLabel(l?.detail.status)}</td>
+                          <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{n.key === 'ROOT' ? '-' : (l?.quantity ?? '-')}</td>
                           <td className="w-px bg-gray-200 p-0" />
                           <td
                             className="relative px-2 py-2 text-xs font-medium whitespace-nowrap"
@@ -496,7 +538,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
                               <span
                                 key={k}
                                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                                style={{ left: 16 + k * 12 }}
+                                style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
                               />
                             ))}
                             <span className="inline-flex items-center gap-1">
@@ -505,9 +547,9 @@ export default function PartCompareModal({ open, onClose }: Props) {
                             </span>
                           </td>
                           <td className={`px-2 py-2 text-xs text-gray-700 truncate max-w-[200px] ${versionChanged ? 'font-semibold' : ''}`} title={r?.detail.name || ''}>{r?.detail.name || '-'}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'font-semibold' : 'text-gray-500'}`}>{r?.detail.version || '-'}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'font-semibold' : 'text-gray-500'}`}>{statusLabel(r?.detail.status)}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'font-semibold' : 'text-gray-500'}`}>{n.key === 'ROOT' ? '-' : (r?.quantity ?? '-')}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{r?.detail.version || '-'}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{statusLabel(r?.detail.status)}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{n.key === 'ROOT' ? '-' : (r?.quantity ?? '-')}</td>
                           <td className="w-px bg-gray-200 p-0" />
                           <td className="px-2 py-2 text-xs text-gray-700">{changeText(n)}</td>
                         </tr>

@@ -61,6 +61,17 @@ export interface TaskLink {
   entity_name?: string | null;
   entity_spec?: string | null;
   entity_remark?: string | null;
+  /** 零部件/构型项等实体的主数据 id（跳转详情用），后端 _link_dict 返回 */
+  entity_master_id?: string | null;
+  /** 零部件/图文档关联的版本号与状态（后端 _link_dict 返回） */
+  entity_version?: string | null;
+  entity_status?: string | null;
+  /** 零部件实际类型（'part' | 'assembly'，后端 _link_dict 返回；关联可能统一存 part） */
+  entity_kind?: string | null;
+  /** 生产附件是否含 STP/STEP（零件 3D 预览可用性，后端 _link_dict 返回） */
+  has_stp?: boolean;
+  /** 图文档附件数（预览按钮置灰用，后端 _link_dict 返回） */
+  attachment_count?: number;
 }
 
 export interface TaskComment {
@@ -96,6 +107,7 @@ export interface GanttTask {
   duration_days: number | null;
   is_critical: boolean;
   is_overdue: boolean;
+  link_count?: number;
   sort_order: number;
   depth: number;
 }

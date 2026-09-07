@@ -1,4 +1,5 @@
 import { useViewerStore } from '../../stores/viewerStore';
+import Button from '../ui/Button';
 
 export function Toolbar() {
   const vs = useViewerStore((s) => s);
@@ -35,91 +36,56 @@ export function Toolbar() {
   ];
 
   return (
-    <div className="relative border-b border-gray-100 bg-white shadow-sm">
-      <div className="flex items-center gap-3 px-4 py-2">
+    <div className="relative border-b border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] shadow-sm">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
       {compare && (
         <>
-          <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 overflow-hidden shrink-0">
-            {DISPLAY_MODES.map((m, i) => (
-              <button
-                key={m.value}
-                onClick={() => setDisplayMode(m.value)}
-                className={`px-2.5 py-1.5 text-sm font-medium transition-colors
-                  ${compare.displayMode === m.value ? 'bg-primary-50 text-primary-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}
-                  ${i > 0 ? 'border-l border-gray-200' : ''}`}
-              >
+          <div className="flex items-center gap-2 shrink-0">
+            {DISPLAY_MODES.map((m) => (
+              <Button key={m.value} size="md" active={compare.displayMode === m.value} onClick={() => setDisplayMode(m.value)}>
                 {m.label}
-              </button>
+              </Button>
             ))}
           </div>
 
-          <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer select-none shrink-0">
-            <input
-              type="checkbox"
-              checked={compare.onlyDiff}
-              onChange={(e) => setOnlyDiff(e.target.checked)}
-              className="accent-primary-500"
-            />
+          <Button size="md" active={compare.onlyDiff} onClick={() => setOnlyDiff(!compare.onlyDiff)}>
             仅显示差异
-          </label>
+          </Button>
 
-          <div className="flex items-center gap-2 text-sm text-gray-500 shrink-0">
-            <span className="font-medium">幽灵</span>
-            <input
-              type="range"
-              min={0.02}
-              max={0.5}
-              step={0.01}
-              value={compare.ghostOpacity}
-              onChange={(e) => setGhostOpacity(Number(e.target.value))}
-              className="w-16 h-1 accent-primary-500"
-              title="淡出零件的不透明度"
-            />
-            <span className="tabular-nums text-gray-400 w-8">{compare.ghostOpacity.toFixed(2)}</span>
-          </div>
-
-          <div className="w-px h-5 bg-gray-200 shrink-0" />
+          <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
         </>
       )}
 
       {/* Section planes toggles */}
-      <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 overflow-hidden shrink-0">
-        {(['x', 'y', 'z'] as const).map((axis, i) => {
+      <div className="flex items-center gap-2 shrink-0">
+        {(['x', 'y', 'z'] as const).map((axis) => {
           const plane = getPlane(axis);
           return (
-            <label
+            <Button
               key={axis}
-              className={`flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium uppercase cursor-pointer select-none transition-colors
-                ${plane ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}
-                ${i > 0 ? 'border-l border-gray-200' : ''}`}
+              size="md"
+              active={!!plane}
+              onClick={() => (plane ? removeClipPlane(axis) : setClipPlane(axis, 0))}
             >
-              <input
-                type="checkbox"
-                checked={!!plane}
-                onChange={(e) => e.target.checked ? setClipPlane(axis, 0) : removeClipPlane(axis)}
-                className="sr-only"
-              />
-              {axis}
-            </label>
+              {axis.toUpperCase()}
+            </Button>
           );
         })}
       </div>
 
-      <div className="w-px h-5 bg-gray-200 shrink-0" />
+      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
 
       {/* Measure mode */}
-      <button
+      <Button
+        size="md"
+        active={measureMode === 'distance'}
         onClick={() => setMeasureMode(measureMode === 'distance' ? 'off' : 'distance')}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${measureMode === 'distance'
-            ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
       >
         测量
-      </button>
+      </Button>
 
       {/* Explode */}
-      <div className="flex items-center gap-2 text-sm text-gray-500">
+      <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)]">
         <span className="font-medium">爆炸</span>
         <input
           type="range"
@@ -128,68 +94,70 @@ export function Toolbar() {
           step={0.1}
           value={explodeValue}
           onChange={(e) => setExplode(Number(e.target.value))}
-          className="w-14 h-1 accent-blue-500"
+          className="w-14 h-1 accent-primary-500"
         />
       </div>
 
-      <div className="w-px h-5 bg-gray-200 shrink-0" />
+      {/* Ghost opacity（对比淡出非匹配 / 装配预览全局淡出） */}
+      <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)] shrink-0">
+        <span className="font-medium">幽灵</span>
+        <input
+          type="range"
+          min={0.05}
+          max={0.3}
+          step={0.01}
+          value={vs.ghostOpacity}
+          onChange={(e) => setGhostOpacity(Number(e.target.value))}
+          className="w-16 h-1 accent-primary-500"
+          title="淡出零件的不透明度"
+        />
+        <span className="tabular-nums text-[var(--ui-text-tertiary)] w-8">{vs.ghostOpacity.toFixed(2)}</span>
+      </div>
+
+      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
 
       {/* Reset */}
-      <button onClick={resetAction}
-        className="text-sm px-3 py-1.5 rounded-md font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent transition-colors"
-      >
+      <Button size="md" variant="secondary" onClick={resetAction}>
         重置
-      </button>
+      </Button>
 
       {/* Camera mode */}
-      <button
+      <Button
+        size="md"
+        active={cameraMode === 'orthographic'}
         onClick={toggleCameraMode}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${cameraMode === 'orthographic'
-            ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
       >
         {cameraMode === 'orthographic' ? '平行' : '透视'}
-      </button>
+      </Button>
 
       {/* Wireframe */}
-      <button
-        onClick={onWireframe}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${wireframe
-            ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
-      >
+      <Button size="md" active={wireframe} onClick={onWireframe}>
         线框
-      </button>
+      </Button>
 
       {/* Auto color */}
-      <button
+      <Button
+        size="md"
+        active={autoColor}
         onClick={onAutoColor}
         disabled={!!compare}
         title={compare ? '对比模式下按变更类型着色' : undefined}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${compare
-            ? 'text-gray-300 cursor-not-allowed border border-transparent'
-            : autoColor
-              ? 'bg-blue-50 text-blue-600 border border-blue-200'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
       >
         上色
-      </button>
+      </Button>
       </div>
 
       {/* Section plane slider popup */}
       {activeAxes.length > 0 && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-full z-20 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3">
+        <div className="absolute left-1/2 -translate-x-1/2 top-full z-20 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg px-4 py-3">
           {(['x', 'y', 'z'] as const).map((axis) => {
             const plane = getPlane(axis);
             return plane ? (
               <div key={axis} className="flex items-center gap-2 text-sm py-0.5">
-                <span className="font-semibold uppercase text-gray-400 w-4">{axis}</span>
+                <span className="font-semibold uppercase text-[var(--ui-text-tertiary)] w-4">{axis}</span>
                 <button
                   onClick={() => toggleClipFlip(axis)}
-                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${(plane as any).flip ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${(plane as any).flip ? 'text-blue-500 bg-blue-50' : 'text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)]'}`}
                   title="切换剖面方向"
                 >
                   {(plane as any).flip ? '>' : '<'}
@@ -201,7 +169,7 @@ export function Toolbar() {
                   step={0.1}
                   value={(plane as any).position}
                   onChange={(e) => setClipPlane(axis, Number(e.target.value))}
-                  className="w-48 h-1 accent-blue-500"
+                  className="w-48 h-1 accent-primary-500"
                 />
               </div>
             ) : null;

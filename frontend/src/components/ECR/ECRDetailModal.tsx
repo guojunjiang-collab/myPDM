@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, documentsApi, customFieldsApi, mediaApi } from '../../services/api';
@@ -6,9 +6,16 @@ import { useAuthStore, canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { exportEcrPdf } from '../../services/ecPdfExport';
 import { useDataStore } from '../../stores/data';
 import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
+import Tabs from '../ui/Tabs';
 import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
 import DocumentDetailModal from '../DocumentDetailModal';
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import SortableTh from '../ui/SortableTh';
+import Textarea from '../ui/Textarea';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink, Document } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
@@ -26,13 +33,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   process_change: '工艺变更',
   material_change: '材料变更',
   other: '其他',
-};
-
-const PRIORITY_LABELS: Record<string, string> = {
-  urgent: '紧急',
-  high: '高',
-  normal: '普通',
-  low: '低',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -78,9 +78,25 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
   const [viewDocRevisionId, setViewDocRevisionId] = useState<string | null>(null);
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
 
+  // 关联图文档表排序（值混合 link 顶层与 docDetails，包装扁平排序键）
+  const sortableDocLinks = useMemo(() => (detail?.document_links || []).map((link: any) => {
+    const doc = docDetails[link.document_id];
+    return {
+      ...link,
+      _code: doc?.code || link.document_code || '',
+      _name: doc?.name || link.document_name || '',
+      _version: doc?.version || link.document_version || '',
+      _status: doc?.status || '',
+    };
+  }), [detail, docDetails]);
+  const { sortedData: sortedDocLinks, sortField: docSortField, sortDirection: docSortDirection, handleSort: handleDocSort } = useTableSort<any>(sortableDocLinks, { fieldComparators: { _version: (a, b) => compareVersions(String(a), String(b)) } });
+
   // Review action state
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closeComment, setCloseComment] = useState('');
+
+  // Tab 分页（参考零部件详情：基本信息/审批/关联图文档/受影响物料）
+  const [activeTab, setActiveTab] = useState<'info' | 'review' | 'docs' | 'items'>('info');
 
   const loadDetail = useCallback(async () => {
     if (!ecrId) return;
@@ -136,7 +152,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       a.click();
       document.body.removeChild(a);
     } catch {
-      alert('下载失败，请重试');
+      toast.error('下载失败，请重试');
     }
   };
 
@@ -146,24 +162,24 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       try {
         const mt = await mediaApi.token(attId, 'preview');
         window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
+      } catch { toast.error('预览失败，请重试'); }
       return;
     }
     if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) {
       try {
         const mt = await mediaApi.token(attId, 'preview');
         window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
+      } catch { toast.error('预览失败，请重试'); }
       return;
     }
     if (ext === 'stp' || ext === 'step') {
       try {
         const mt = await mediaApi.token(attId, 'gltf');
         window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
+      } catch { toast.error('预览失败，请重试'); }
       return;
     }
-    alert('该格式暂不支持预览');
+    toast.info('该格式暂不支持预览');
   };
 
   useEffect(() => {
@@ -172,6 +188,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       loadStatusLogs();
       setShowCloseForm(false);
       setCloseComment('');
+      setActiveTab('info');
     }
   }, [open, ecrId, loadDetail, loadStatusLogs]);
 
@@ -271,13 +288,12 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
         return (
           <div className="flex gap-2 flex-wrap">
             {isCreator && (
-              <button onClick={handleWithdraw} disabled={busy}
-                className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50">
+              <Button size="sm" onClick={handleWithdraw} disabled={busy}>
                 {busy ? '处理中...' : '撤回评审'}
-              </button>
+              </Button>
             )}
             {isCurrentReviewer() && hasPendingReview() && (
-              <span className="text-sm text-blue-600 self-center">👆 请在上方审批区域进行操作</span>
+              <span className="text-sm text-blue-600 self-center">请到「审批」Tab 进行审批操作</span>
             )}
           </div>
         );
@@ -296,22 +312,22 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       open={open}
       onClose={onClose}
       width="3xl"
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">ECR 详情</h3>
-        {detail && canDownload() && (
-          <button
+      title="ECR 详情"
+      height="75vh"
+      headerAction={
+        detail && canDownload() ? (
+          <Button variant="secondary" size="sm"
             onClick={() => { try { exportEcrPdf(detail, statusLogs); } catch { toast.error('导出失败'); } }}
-            className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
             title="导出为 PDF 文档（展开所有信息，打印另存为 PDF）"
           >
             📄 导出PDF
-          </button>
-        )}
-      </div>
+          </Button>
+        ) : undefined
+      }
+    >
       {loading && !detail ? (
         <div className="flex items-center justify-center py-12">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-[var(--ui-text-secondary)]">
             <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -320,28 +336,49 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           </div>
         </div>
       ) : !detail ? (
-        <div className="text-center text-gray-500 py-12">暂无数据</div>
+        <div className="text-center text-[var(--ui-text-secondary)] py-12">暂无数据</div>
       ) : (
-        <div className="print-area space-y-6 max-h-[70vh] overflow-y-auto pr-1">
-          {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-            <div>
-              <div className="text-lg font-bold text-gray-900">
-                {detail.ecr_number}
-              </div>
-              <div className="text-sm text-gray-500 mt-0.5">{detail.title}</div>
+        <div className="h-full flex flex-col min-h-0">
+          {/* 常驻摘要条：编号 + 标题 + 状态/优先级 + 操作按钮 */}
+          <div className="flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--ui-border)] shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-lg font-bold text-[var(--ui-text-primary)] shrink-0">{detail.ecr_number}</span>
+              <span className="text-sm text-[var(--ui-text-secondary)] truncate">{detail.title}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <ECRStatusBadge status={detail.status} />
               <ECRPriorityBadge priority={detail.priority} />
+              {renderActions()}
             </div>
           </div>
+
+          {/* Tab 栏 */}
+          <div className="shrink-0 mb-3">
+            <Tabs
+              items={[
+                { key: 'info', label: '基本信息' },
+                { key: 'items', label: '受影响物料' },
+                { key: 'docs', label: '关联图文档' },
+                { key: 'review', label: '审批' },
+              ]}
+              activeKey={activeTab}
+              onChange={(k) => setActiveTab(k as any)}
+            />
+          </div>
+
+          {/* Tab 内容区 */}
+          <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-6">
+            {activeTab === 'info' && (
+              <>
 
           {/* Basic Info */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <InfoItem label="变更原因" value={REASON_LABELS[detail.reason] || detail.reason} />
             <InfoItem label="变更类别" value={CATEGORY_LABELS[detail.category || ''] || detail.category || '-'} />
-            <InfoItem label="优先级" value={PRIORITY_LABELS[detail.priority] || detail.priority} />
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</div>
+              <div className="pt-0.5"><ECRPriorityBadge priority={detail.priority} /></div>
+            </div>
             <InfoItem label="审批模式" value={detail.review_mode === 'all' ? '会签' : '或签'} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -360,22 +397,24 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             />
           </div>
 
-          {/* Description */}
-          {detail.description && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 变更描述</h4>
-              <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-gray-200">
-                {detail.description}
-              </div>
+          {/* Description（常驻展示，空描述显示占位） */}
+          <div>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📝 变更描述</h4>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">
+              {detail.description || '-'}
             </div>
-          )}
+          </div>
 
+            </>
+          )}
+          {activeTab === 'review' && (
+            <>
           {/* Review Progress */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">
               👥 审批进度
               {detail.reviewers && detail.reviewers.length > 0 && (
-                <span className="ml-2 text-xs font-normal text-gray-500">
+                <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">
                   ({detail.approved_count || 0}/{detail.reviewers_count || detail.reviewers.length} 已审批)
                 </span>
               )}
@@ -389,145 +428,10 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             />
           </div>
 
-          {/* Document Links */}
-          {detail.document_links && detail.document_links.length > 0 ? (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">关联图文档</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                      {docFieldDefs.map((def) => (
-                        <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
-                      ))}
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {detail.document_links.map((link, idx) => {
-                      const doc = docDetails[link.document_id];
-                      const atts = docAttachments[link.document_id] || [];
-                      return (
-                        <tr key={link.document_id || idx}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => setViewDocRevisionId(link.document_id)}>
-                          <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
-                          <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
-                          <td className="px-3 py-2 text-sm">
-                            {doc?.status ? (
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                doc.status === 'draft' ? 'bg-blue-100 text-blue-800' :
-                                doc.status === 'frozen' ? 'bg-orange-100 text-orange-800' :
-                                doc.status === 'released' ? 'bg-green-100 text-green-800' :
-                                doc.status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {({draft:'草稿', frozen:'冻结', released:'发布', obsolete:'作废'} as Record<string, string>)[doc.status] || doc.status}
-                              </span>
-                            ) : '-'}
-                          </td>
-                          {docFieldDefs.map((def) => {
-                            const vals = docCustomValues[link.document_id] || {};
-                            const val = vals[def.id];
-                            return (
-                              <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
-                                {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-2 text-sm text-gray-500">
-                            {atts.length > 0 ? atts.map((a: any) => (
-                              <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>
-                            )) : '-'}
-                          </td>
-                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-center gap-1">
-                              {atts.length > 0 && (
-                                <button onClick={() => handleDocPreview(atts[0].id, atts[0].file_name)}
-                                  className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800"
-                                  title="预览">预览</button>
-                              )}
-                              {atts.length > 0 && (
-                                <button onClick={() => handleDocDownload(atts[0].id, atts[0].file_name)}
-                                  className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800"
-                                  title="下载">下载</button>
-                              )}
-                              {atts.length === 0 && <span className="text-xs text-gray-400">-</span>}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Affected Items */}
-          {detail.affected_items && detail.affected_items.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                📦 受影响物料 ({detail.affected_items.length})
-              </h4>
-              <div className="space-y-4">
-                {detail.affected_items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="border border-gray-200 rounded-lg overflow-hidden"
-                  >
-                    {/* Item header */}
-                    <div className="flex items-center gap-3 p-3 bg-gray-50">
-                      <span
-                        className={`px-2 py-0.5 text-xs rounded ${
-                          item.entity_type === 'part'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}
-                      >
-                        {item.entity_type === 'part' ? '零件' : '部件'}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
-                      <span className="text-sm text-gray-600">{item.entity_name}</span>
-                      <span className="text-xs text-gray-400">v{item.entity_version}</span>
-                      {item.change_type && (
-                        <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                          {item.change_type}
-                        </span>
-                      )}
-                      {item.change_description && (
-                        <span className="text-xs text-gray-500 flex-1 truncate">
-                          {item.change_description}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Bom impact result */}
-                    {item.bom_impact && (
-                      <div className="p-3 border-t border-gray-200">
-                        <ECRBomImpactView
-                          upwardChain={item.bom_impact.upward_chain}
-                          downwardItems={item.bom_impact.downward_items}
-                          onChange={() => {}}
-                          editable={false}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Status Log */}
+          {/* Status Log（审批 Tab） */}
           {statusLogs.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">📋 状态记录</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">📋 状态记录</h4>
               <div className="space-y-0">
                 {statusLogs.map((log) => (
                   <div key={log.id} className="flex gap-3 pb-4">
@@ -547,9 +451,9 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                       <div className="w-0.5 flex-1 bg-gray-200 min-h-[16px]" />
                     </div>
                     <div className="flex-1 pb-1">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-[var(--ui-text-primary)]">
                         <span className="font-medium">{log.operator_name}</span>
-                        <span className="text-gray-500 mx-1">·</span>
+                        <span className="text-[var(--ui-text-secondary)] mx-1">·</span>
                         <span
                           className={`${
                             log.to_status === 'approved'
@@ -565,9 +469,9 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                         </span>
                       </div>
                       {log.comment && (
-                        <div className="text-sm text-gray-500 mt-0.5">{log.comment}</div>
+                        <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>
                       )}
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">
                         {new Date(log.created_at).toLocaleString('zh-CN')}
                       </div>
                     </div>
@@ -577,43 +481,164 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             </div>
           )}
 
-          {/* Close form */}
+          {/* Close form（审批 Tab） */}
           {showCloseForm && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <h4 className="text-sm font-semibold text-red-700 mb-2">关闭 ECR</h4>
-              <textarea
+              <Textarea
                 value={closeComment}
                 onChange={(e) => setCloseComment(e.target.value)}
                 rows={2}
-                className="w-full border border-red-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                className="!border-red-300 resize-none"
                 placeholder="关闭原因（可选）"
               />
               <div className="flex gap-2 mt-2">
-                <button
+                <Button variant="danger" size="sm"
                   onClick={handleClose}
                   disabled={actionLoading}
-                  className="px-4 py-1.5 text-sm rounded bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {actionLoading ? '处理中...' : '确认关闭'}
-                </button>
-                <button
+                </Button>
+                <Button variant="secondary" size="sm"
                   onClick={() => {
                     setShowCloseForm(false);
                     setCloseComment('');
                   }}
-                  className="px-4 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                 >
                   取消
-                </button>
+                </Button>
               </div>
             </div>
           )}
+            </>
+          )}
+          {activeTab === 'docs' && (
+            <>
+          {/* Document Links */}
+          {detail.document_links && detail.document_links.length > 0 ? (
+            <div className="border-t pt-4">
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">关联图文档</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-[var(--ui-bg-subtle)] border-b">
+                    <tr>
+                      <SortableTh sortKey="_code" active={docSortField === '_code'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档编号</SortableTh>
+                      <SortableTh sortKey="_name" active={docSortField === '_name'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档名称</SortableTh>
+                      <SortableTh sortKey="_version" active={docSortField === '_version'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">版本</SortableTh>
+                      <SortableTh sortKey="_status" active={docSortField === '_status'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">状态</SortableTh>
+                      {docFieldDefs.map((def) => (
+                        <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
+                      ))}
+                      <SortableTh className="text-left">附件</SortableTh>
+                      <SortableTh className="text-center whitespace-nowrap w-28">操作</SortableTh>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sortedDocLinks.map((link, idx) => {
+                      const doc = docDetails[link.document_id];
+                      const atts = docAttachments[link.document_id] || [];
+                      return (
+                        <tr key={link.document_id || idx}
+                          className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
+                          onClick={() => setViewDocRevisionId(link.document_id)}>
+                          <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
+                          <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
+                          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.version || link.document_version || '-'}</td>
+                          <td className="px-3 py-2 text-sm">
+                            {doc?.status ? (
+                              <Badge status={doc.status} />
+                            ) : '-'}
+                          </td>
+                          {docFieldDefs.map((def) => {
+                            const vals = docCustomValues[link.document_id] || {};
+                            const val = vals[def.id];
+                            return (
+                              <td key={def.id} className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
+                                {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
+                            {atts.length > 0 ? atts.map((a: any) => (
+                              <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>
+                            )) : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1">
+                              {atts.length > 0 && (
+                                <Button variant="link" size="xs" onClick={() => handleDocPreview(atts[0].id, atts[0].file_name)}
+                                  title="预览">预览</Button>
+                              )}
+                              {atts.length > 0 && (
+                                <Button variant="link" size="xs" onClick={() => handleDocDownload(atts[0].id, atts[0].file_name)}
+                                  title="下载">下载</Button>
+                              )}
+                              {atts.length === 0 && <span className="text-xs text-[var(--ui-text-tertiary)]">-</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+            </>
+          )}
+          {activeTab === 'items' && (
+            <>
+          {/* Affected Items */}
+          {detail.affected_items && detail.affected_items.length > 0 && (
+            <div>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">
+                📦 受影响物料 ({detail.affected_items.length})
+              </h4>
+              <div className="space-y-4">
+                {detail.affected_items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="border border-[var(--ui-border)] rounded-lg overflow-hidden"
+                  >
+                    {/* Item header */}
+                    <div className="flex items-center gap-3 p-3 bg-[var(--ui-bg-subtle)]">
+                      <Badge
+                        tone={item.entity_type === 'part' ? 'blue' : 'gray'}
+                        label={item.entity_type === 'part' ? '零件' : '部件'}
+                      />
+                      <span className="text-sm font-medium text-[var(--ui-text-primary)]">{item.entity_code}</span>
+                      <span className="text-sm text-[var(--ui-text-secondary)]">{item.entity_name}</span>
+                      <span className="text-xs text-[var(--ui-text-tertiary)]">v{item.entity_version}</span>
+                      {item.change_type && (
+                        <Badge status={item.change_type} domain="action" />
+                      )}
+                      {item.change_description && (
+                        <span className="text-xs text-[var(--ui-text-secondary)] flex-1 truncate">
+                          {item.change_description}
+                        </span>
+                      )}
+                    </div>
 
-          {/* Action buttons */}
-          <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
-            {renderActions()}
-          </div>
+                    {/* Bom impact result */}
+                    {item.bom_impact && (
+                      <div className="p-3 border-t border-[var(--ui-border)]">
+                        <ECRBomImpactView
+                          upwardChain={item.bom_impact.upward_chain}
+                          downwardItems={item.bom_impact.downward_items}
+                          onChange={() => {}}
+                          editable={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+            </>
+          )}
         </div>
+      </div>
       )}
     </Modal>
 
@@ -641,9 +666,9 @@ function InfoItem({
   icon?: string;
 }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium">
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium">
         {icon && <span className="mr-1">{icon}</span>}
         {value}
       </div>

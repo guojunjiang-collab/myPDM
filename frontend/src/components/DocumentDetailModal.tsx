@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Modal } from './Modal';
+import { Modal, ConfirmModal } from './Modal';
 import { Loading } from './Loading';
 import { toast } from './Toast';
 import { useAuthStore, isAdmin as checkIsAdmin } from '../stores/auth';
@@ -15,6 +15,13 @@ import PartDetailModal from './PartDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
 import { ECODetailModal } from './ECO/ECODetailModal';
 import { ECRDetailModal } from './ECR/ECRDetailModal';
+import Badge from './ui/Badge';
+import Button from './ui/Button';
+import Input from './ui/Input';
+import SortableTh from './ui/SortableTh';
+import CheckinNoteModal from './CheckinNoteModal';
+import { useTableSort } from '../hooks/useTableSort';
+import { compareVersions } from '../constants';
 import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
@@ -29,16 +36,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
-
-const statusTag = (s: string) => {
-  const tags: Record<string, { label: string; class: string }> = {
-    draft: { label: '草稿', class: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', class: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', class: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', class: 'bg-red-100 text-red-800' },
-  };
-  return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
-};
 
 type TabKey = 'attachments' | 'versions' | 'iterations' | 'custom-fields' | 'whereused';
 
@@ -73,6 +70,8 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   const [wuTask, setWuTask] = useState<{ projectId: string; task: any } | null>(null);
   const [wuEco, setWuEco] = useState<string | null>(null);
   const [wuEcr, setWuEcr] = useState<string | null>(null);
+  // 删除迭代确认
+  const [confirmDeleteIter, setConfirmDeleteIter] = useState<{ docId: string; iterId: string; iteration: number } | null>(null);
 
   const effectiveRevisionId = viewingVersionId || revisionId;
   const isViewingOtherVersion = !!viewingVersionId && viewingVersionId !== revisionId;
@@ -100,6 +99,12 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   }, [iterations]);
 
   const loadSeq = useRef(0);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  // 附件/版本/迭代 TAB 客户端排序
+  const { sortedData: sortedAttachments, sortField: attSortField, sortDirection: attSortDirection, handleSort: handleAttSort } = useTableSort<AttInfo>(attachments);
+  const { sortedData: sortedVersions, sortField: verSortField, sortDirection: verSortDirection, handleSort: handleVerSort } = useTableSort<DocumentRevision>(versions, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  const { sortedData: sortedIterations, sortField: iterSortField, sortDirection: iterSortDirection, handleSort: handleIterSort } = useTableSort<DocumentIteration>(iterations);
 
   const loadDoc = useCallback(async () => {
     if (!effectiveRevisionId) return;
@@ -189,6 +194,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
 
   useEffect(() => {
     if (open && revisionId) {
+      setActiveTab('attachments');
       setViewingIterationId(null);
       setViewingVersionId(null);
       setIterations([]);
@@ -320,17 +326,9 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
     }
   };
 
-  const handleDeleteAtt = async (attId: string) => {
-    if (!revisionId || !confirm('确定删除该附件？')) return;
-    try {
-      await documentsApi.deleteAttachment(revisionId, attId);
-      await loadAttachments();
-      toast.success('已删除');
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      toast.error(typeof detail === 'string' ? detail : '删除失败');
-    }
-  };
+  // 删除附件确认（状态驱动 ConfirmModal）
+  const [confirmDeleteAttId, setConfirmDeleteAttId] = useState<string | null>(null);
+  const handleDeleteAtt = (attId: string) => setConfirmDeleteAttId(attId);
 
   const handleDownload = async (attId: string, fileName: string) => {
     try {
@@ -365,60 +363,57 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
     savedPatchRef.current = {};
   };
 
-  const tag = doc ? statusTag(doc.status) : { label: '', class: '' };
-
   return (
-    <Modal open={open} title="图文档详情" onClose={handleClose} width="full"
+    <Modal open={open} title="图文档详情" onClose={handleClose} width="full" height="75vh"
       headerAction={(isViewingOtherVersion && doc) ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看版本 {doc.version}（只读）
-          <button onClick={() => setViewingVersionId(null)}
-            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前</button>
+          <Button variant="link" size="xs" onClick={() => setViewingVersionId(null)}>返回当前</Button>
         </span>
       ) : (isViewingHistorical && viewingIteration && !isViewingOtherVersion) ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看 Iteration #{viewingIteration.iteration} 历史数据（只读）
-          <button onClick={() => setViewingIterationId(null)}
-            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前</button>
+          <Button variant="link" size="xs" onClick={() => setViewingIterationId(null)}>返回当前</Button>
         </span>
       ) : undefined}
     >
-      <div className="h-[50vh] flex flex-col">
+      <div className="h-full flex flex-col min-h-0">
         {loading && !doc ? (
           <Loading />
         ) : !doc ? (
-          <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
+          <div className="text-[var(--ui-text-tertiary)] text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
             {/* 信息卡片 */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
               <InfoCard label="图文档编号" readonly={!canEdit}>
                 {canEdit ? (
-                  <input
+                  <Input
                     value={editForm.code}
                     onChange={(e) => autoSave({ code: e.target.value })}
-                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded font-mono focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    size="xs"
+                    className="font-mono"
                   />
                 ) : (
-                  <div className="text-sm text-gray-900 font-medium font-mono">{doc.code}</div>
+                  <div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono">{doc.code}</div>
                 )}
               </InfoCard>
               <InfoCard label="名称" readonly={!canEdit}>
                 {canEdit ? (
-                  <input
+                  <Input
                     value={editForm.name}
                     onChange={(e) => autoSave({ name: e.target.value })}
-                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    size="xs"
                   />
                 ) : (
-                  <div className="text-sm text-gray-900 font-medium">{doc.name}</div>
+                  <div className="text-sm text-[var(--ui-text-primary)] font-medium">{doc.name}</div>
                 )}
               </InfoCard>
               <InfoCard label="用户组" readonly={!canEdit}>
                 {canEdit ? (
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 py-0.5">
                     {allGroups.length === 0 ? (
-                      <span className="text-sm text-gray-400">加载中...</span>
+                      <span className="text-sm text-[var(--ui-text-tertiary)]">加载中...</span>
                     ) : (
                       allGroups.map((g) => (
                         <label key={g.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
@@ -446,7 +441,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-900 font-medium break-all">
+                  <div className="text-sm text-[var(--ui-text-primary)] font-medium break-all">
                     {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
                   </div>
                 )}
@@ -454,118 +449,108 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
             </div>
 
             {/* 操作栏 */}
-            <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3 shrink-0">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-3 mb-3 shrink-0">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-semibold text-sm">版本：{doc.version || '-'}</span>
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
+                  <Badge status={doc.status} />
                   {isCheckedOut ? (
                     <span className="text-xs text-orange-600">已签出：{doc.check_out_user_name || '未知'}</span>
                   ) : (
-                    <span className="text-xs text-gray-400">未签出</span>
+                    <span className="text-xs text-[var(--ui-text-tertiary)]">未签出</span>
                   )}
                 </div>
                 <div className="flex gap-1 flex-wrap items-center">
                   {canCheckout && (
-                    <button onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签出/编辑</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}>签出/编辑</Button>
                   )}
                   {canCheckin && (
-                    <button onClick={() => setShowCheckinModal(true)}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签入/解锁</button>
+                    <Button size="sm" onClick={() => setShowCheckinModal(true)}>签入/解锁</Button>
                   )}
                   {canUndo && (
-                    <button onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}
-                      className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600">撤销签出</button>
+                    <Button variant="dark" size="sm" onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}>撤销签出</Button>
                   )}
                   {canFreeze && (
-                    <button onClick={() => doAction(() => documentsApi.freeze(doc.id), '已冻结')}
-                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">冻结</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.freeze(doc.id), '已冻结')}>冻结</Button>
                   )}
                   {canUnfreeze && (
-                    <button onClick={() => doAction(() => documentsApi.unfreeze(doc.id), '已解冻')}
-                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                    <Button variant="dark" size="sm" onClick={() => doAction(() => documentsApi.unfreeze(doc.id), '已解冻')}>解冻</Button>
                   )}
                   {canRelease && (
-                    <button onClick={() => doAction(() => documentsApi.release(doc.id), '已发布')}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">发布</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.release(doc.id), '已发布')}>发布</Button>
                   )}
                   {canUpgrade && (
-                    <button onClick={() => doAction(() => documentsApi.upgrade(doc.id), '已升版')}
-                      className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700">升版</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.upgrade(doc.id), '已升版')}>升版</Button>
                   )}
                   {canObsolete && (
-                    <button onClick={() => doAction(() => documentsApi.obsolete(doc.id), '已作废')}
-                      className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">作废</button>
+                    <Button variant="danger" size="sm" onClick={() => doAction(() => documentsApi.obsolete(doc.id), '已作废')}>作废</Button>
                   )}
                   {canForceCheckin && (
-                    <button onClick={() => doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入')}
-                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">强制签入</button>
+                    <Button variant="danger" size="sm" onClick={() => doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入')}>强制签入</Button>
                   )}
                 </div>
               </div>
             </div>
 
             {/* Tab 导航 + 内容 */}
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-              <div className="flex border-b border-gray-200 shrink-0">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden flex-1 min-h-0 flex flex-col">
+              <div className="flex border-b border-[var(--ui-border)] shrink-0">
                 {tabs.map((t) => (
                   <button key={t.key} onClick={() => setActiveTab(t.key)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === t.key
                         ? 'border-primary-600 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
                     }`}>
                     {t.label}
                   </button>
                 ))}
               </div>
-              <div className="p-4 overflow-y-auto flex-1">
+              <div className="p-4 overflow-y-auto flex-1 min-h-0">
                 {/* 附件管理 Tab */}
                 {activeTab === 'attachments' && (
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-gray-700">附件列表</h4>
+                      <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">附件列表</h4>
                       {canEdit && !isViewingHistorical && !isViewingOtherVersion && (
-                        <label className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded cursor-pointer hover:bg-primary-700">
-                          {uploading ? '上传中...' : '+ 上传附件'}
-                          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
-                        </label>
+                        <>
+                          <Button size="sm" type="button" onClick={() => uploadInputRef.current?.click()} disabled={uploading}>
+                            {uploading ? '上传中...' : '+ 上传附件'}
+                          </Button>
+                          <input ref={uploadInputRef} type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+                        </>
                       )}
                     </div>
                     {attachments.length === 0 ? (
-                      <div className="text-sm text-gray-400 py-8 text-center border border-dashed border-gray-300 rounded-lg">
+                      <div className="text-sm text-[var(--ui-text-tertiary)] py-8 text-center border border-dashed border-gray-300 rounded-lg">
                         {isViewingHistorical ? '该迭代暂无附件' : '暂无附件'}
                       </div>
                     ) : (
                       <div className="border rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
-                          <thead className="bg-gray-50 border-b">
+                          <thead className="bg-[var(--ui-bg-subtle)] border-b">
                             <tr>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
-                              <th className="px-3 py-2 text-right text-gray-500 font-medium w-40">操作</th>
+                              <SortableTh sortKey="file_name" active={attSortField === 'file_name'} direction={attSortDirection} onSort={(k) => handleAttSort(k as keyof AttInfo)} className="text-left">文件名</SortableTh>
+                              <SortableTh sortKey="file_size" active={attSortField === 'file_size'} direction={attSortDirection} onSort={(k) => handleAttSort(k as keyof AttInfo)} className="text-left w-24">大小</SortableTh>
+                              <SortableTh sortKey="created_at" active={attSortField === 'created_at'} direction={attSortDirection} onSort={(k) => handleAttSort(k as keyof AttInfo)} className="text-left w-40">上传时间</SortableTh>
+                              <SortableTh align="right" className="w-56">操作</SortableTh>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {attachments.map((att) => (
-                              <tr key={att.id} className="hover:bg-gray-50">
+                            {sortedAttachments.map((att) => (
+                              <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                                 <td className="px-3 py-2 text-primary-600">{att.file_name}</td>
-                                <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
-                                <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
-                                <td className="px-3 py-2 text-right">
-                                  <button
+                                <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatFileSize(att.file_size || 0)}</td>
+                                <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatDateTime(att.created_at)}</td>
+                                <td className="px-3 py-2 text-right whitespace-nowrap">
+                                  <Button variant="link" size="xs" className="mr-2"
                                     onClick={() => previewAttachment(att.id, att.file_name || 'preview', {
                                       onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
-                                    })}
-                                    className="text-blue-600 hover:text-blue-800 mr-2">预览</button>
-                                  <button
-                                    onClick={() => handleDownload(att.id, att.file_name || 'download')}
-                                    className="text-primary-600 hover:text-primary-800 mr-2">下载</button>
+                                    })}>预览</Button>
+                                  <Button variant="link" size="xs" className="mr-2"
+                                    onClick={() => handleDownload(att.id, att.file_name || 'download')}>下载</Button>
                                   {canEdit && !isViewingHistorical && (
-                                    <button onClick={() => handleDeleteAtt(att.id)}
-                                      className="text-red-600 hover:text-red-800">删除</button>
+                                    <Button variant="danger" size="xs" onClick={() => handleDeleteAtt(att.id)}>删除</Button>
                                   )}
                                 </td>
                               </tr>
@@ -580,9 +565,9 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 {/* 自定义字段 Tab */}
                 {activeTab === 'custom-fields' && (
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">自定义字段</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">自定义字段</h4>
                     {cfDefs.length === 0 ? (
-                      <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg py-8 text-center">无</div>
+                      <div className="text-sm text-[var(--ui-text-tertiary)] border border-dashed border-[var(--ui-border)] rounded-lg py-8 text-center">无</div>
                     ) : (
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -596,8 +581,8 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                               }
                             };
                             return (
-                              <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                                <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
+                              <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                                <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div>
                                 <CustomFieldInput
                                   def={def}
                                   value={val}
@@ -610,7 +595,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                         </div>
                       </div>
                     )}
-                    <div className="mt-4 text-xs text-gray-400">
+                    <div className="mt-4 text-xs text-[var(--ui-text-tertiary)]">
                       创建人：{doc.creator_name || '-'} | 创建时间：{doc.created_at ? new Date(doc.created_at).toLocaleString('zh-CN') : '-'}
                     </div>
                   </div>
@@ -620,42 +605,40 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 {activeTab === 'versions' && (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">创建时间</th>
-                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                          <SortableTh sortKey="version" active={verSortField === 'version'} direction={verSortDirection} onSort={(k) => handleVerSort(k as keyof DocumentRevision)} className="text-left w-16">版本</SortableTh>
+                          <SortableTh sortKey="status" active={verSortField === 'status'} direction={verSortDirection} onSort={(k) => handleVerSort(k as keyof DocumentRevision)} className="text-left w-20">状态</SortableTh>
+                          <SortableTh sortKey="created_at" active={verSortField === 'created_at'} direction={verSortDirection} onSort={(k) => handleVerSort(k as keyof DocumentRevision)} className="text-left w-44">创建时间</SortableTh>
+                          <SortableTh align="right" className="w-24">操作</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {versions.map((v) => {
+                        {sortedVersions.map((v) => {
                           const isCurrent = v.id === currentRevisionId;
                           const isViewing = v.id === viewingVersionId;
                           return (
-                            <tr key={v.id} className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}>
+                            <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] ${isViewing ? 'bg-blue-50' : ''}`}>
                               <td className="px-3 py-2">{v.version}</td>
                               <td className="px-3 py-2">
-                                <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(v.status).class}`}>
-                                  {statusTag(v.status).label}
-                                </span>
+                                <Badge status={v.status} />
                               </td>
-                              <td className="px-3 py-2 text-gray-500">{formatDateTime(v.created_at)}</td>
+                              <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatDateTime(v.created_at)}</td>
                               <td className="px-3 py-2 text-right">
                                 {isCurrent ? (
                                   <span className="text-primary-600 text-xs">当前</span>
                                 ) : (
-                                  <button onClick={() => setViewingVersionId(v.id)}
-                                    className={`text-xs hover:underline ${isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'}`}>
+                                  <Button variant="link" size="xs" className={isViewing ? 'text-orange-600' : ''}
+                                    onClick={() => setViewingVersionId(v.id)}>
                                     {isViewing ? '查看中' : '切换'}
-                                  </button>
+                                  </Button>
                                 )}
                               </td>
                             </tr>
                           );
                         })}
                         {versions.length === 0 && (
-                          <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">暂无版本历史</td></tr>
+                          <tr><td colSpan={4} className="px-3 py-4 text-center text-[var(--ui-text-tertiary)]">暂无版本历史</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -666,52 +649,44 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 {activeTab === 'iterations' && (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">迭代</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">签入时间</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">签入说明</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">创建人</th>
-                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                          <SortableTh sortKey="iteration" active={iterSortField === 'iteration'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left w-16">迭代</SortableTh>
+                          <SortableTh sortKey="check_in_date" active={iterSortField === 'check_in_date'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left w-44">签入时间</SortableTh>
+                          <SortableTh sortKey="check_in_note" active={iterSortField === 'check_in_note'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left">签入说明</SortableTh>
+                          <SortableTh sortKey="creator_name" active={iterSortField === 'creator_name'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left">创建人</SortableTh>
+                          <SortableTh align="right" className="w-24">操作</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {iterations.map((it) => {
+                        {sortedIterations.map((it) => {
                           const isCurrent = it.id === currentIterationId;
                           const isViewing = it.id === viewingIterationId;
                           return (
-                            <tr key={it.id} className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}>
+                            <tr key={it.id} className={`hover:bg-[var(--ui-bg-hover)] ${isViewing ? 'bg-blue-50' : ''}`}>
                               <td className="px-3 py-2">#{it.iteration}</td>
-                              <td className="px-3 py-2 text-gray-500">
+                              <td className="px-3 py-2 text-[var(--ui-text-secondary)]">
                                 {(it.check_in_date || it.created_at)
                                   ? new Date(it.check_in_date || it.created_at as string).toLocaleString('zh-CN', { hour12: false })
                                   : '-'}
                               </td>
                               <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
-                              <td className="px-3 py-2 text-gray-500">{(it as any).creator_name || '-'}</td>
+                              <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{(it as any).creator_name || '-'}</td>
                               <td className="px-3 py-2 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   {isCurrent ? (
                                     <span className="text-primary-600 text-xs">当前</span>
                                   ) : (
-                                    <button onClick={() => setViewingIterationId(it.id)}
-                                      className={`text-xs hover:underline ${isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'}`}>
+                                    <Button variant="link" size="xs" className={isViewing ? 'text-orange-600' : ''}
+                                      onClick={() => setViewingIterationId(it.id)}>
                                       {isViewing ? '查看中' : '查看数据'}
-                                    </button>
+                                    </Button>
                                   )}
                                   {it.iteration > 1 && checkIsAdmin() && (
-                                    <button onClick={async () => {
-                                      if (!doc || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
-                                      try {
-                                        await documentsApi.deleteIteration(doc.id, it.id);
-                                        toast.success('迭代已删除');
-                                        await loadIterations();
-                                        await loadAttachments();
-                                        onSaved();
-                                      } catch (e: any) {
-                                        toast.error(e?.response?.data?.detail || '删除失败');
-                                      }
-                                    }} className="text-xs text-red-600 hover:text-red-800 hover:underline">删除</button>
+                                    <Button variant="danger" size="xs" onClick={() => {
+                                      if (!doc) return;
+                                      setConfirmDeleteIter({ docId: doc.id, iterId: it.id, iteration: it.iteration });
+                                    }}>删除</Button>
                                   )}
                                 </div>
                               </td>
@@ -719,7 +694,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                           );
                         })}
                         {iterations.length === 0 && (
-                          <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">暂无迭代记录</td></tr>
+                          <tr><td colSpan={4} className="px-3 py-4 text-center text-[var(--ui-text-tertiary)]">暂无迭代记录</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -741,28 +716,19 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
         )}
       </div>
 
-      {/* 签入说明弹窗 */}
-      {showCheckinModal && (
-        <Modal open={showCheckinModal} title="签入说明" onClose={() => setShowCheckinModal(false)} width="md">
-          <textarea
-            value={checkinNote}
-            onChange={(e) => setCheckinNote(e.target.value)}
-            placeholder="请输入签入说明（选填）..."
-            rows={4}
-            className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <div className="flex justify-end gap-2 mt-3">
-            <button onClick={() => setShowCheckinModal(false)}
-              className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600">取消</button>
-            <button onClick={async () => {
-              if (!doc) return;
-              await doAction(() => documentsApi.checkin(doc.id, checkinNote || undefined), '签入成功');
-              setShowCheckinModal(false);
-              setCheckinNote('');
-            }} className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">确认签入</button>
-          </div>
-        </Modal>
-      )}
+      {/* 签入说明弹窗（共享 CheckinNoteModal） */}
+      <CheckinNoteModal
+        open={showCheckinModal}
+        note={checkinNote}
+        onChange={setCheckinNote}
+        onCancel={() => setShowCheckinModal(false)}
+        onConfirm={async () => {
+          if (!doc) return;
+          await doAction(() => documentsApi.checkin(doc.id, checkinNote || undefined), '签入成功');
+          setShowCheckinModal(false);
+          setCheckinNote('');
+        }}
+      />
 
       {archivePreview && (
         <ArchiveTreeModal
@@ -789,14 +755,61 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
       {wuEcr && (
         <ECRDetailModal open={!!wuEcr} ecrId={wuEcr} onClose={() => setWuEcr(null)} onSuccess={() => {}} />
       )}
+
+      {/* 删除附件确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteAttId}
+        title="确认删除"
+        content="确定删除该附件？"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteAttId || !revisionId) return;
+          try {
+            await documentsApi.deleteAttachment(revisionId, confirmDeleteAttId);
+            await loadAttachments();
+            toast.success('已删除');
+          } catch (e: any) {
+            const detail = e?.response?.data?.detail;
+            toast.error(typeof detail === 'string' ? detail : '删除失败');
+          }
+          setConfirmDeleteAttId(null);
+        }}
+        onCancel={() => setConfirmDeleteAttId(null)}
+      />
+
+      {/* 删除迭代确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteIter}
+        title="确认删除"
+        content={confirmDeleteIter ? `确定删除迭代 #${confirmDeleteIter.iteration}？该迭代的附件也将被删除。` : ''}
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteIter) return;
+          try {
+            await documentsApi.deleteIteration(confirmDeleteIter.docId, confirmDeleteIter.iterId);
+            toast.success('迭代已删除');
+            await loadIterations();
+            await loadAttachments();
+            onSaved();
+          } catch (e: any) {
+            toast.error(e?.response?.data?.detail || '删除失败');
+          }
+          setConfirmDeleteIter(null);
+        }}
+        onCancel={() => setConfirmDeleteIter(null)}
+      />
     </Modal>
   );
 }
 
 function InfoCard({ label, readonly, children }: { label: string; readonly: boolean; children: React.ReactNode }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       {children}
     </div>
   );

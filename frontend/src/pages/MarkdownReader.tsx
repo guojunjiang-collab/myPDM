@@ -103,16 +103,16 @@ export default function MarkdownReader() {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-gray-100">
-      <div className="shrink-0 px-4 py-3 bg-white border-b border-gray-200">
+      <div className="shrink-0 px-4 py-3 bg-[var(--ui-bg-surface)] border-b border-[var(--ui-border)]">
         <h1 className="text-sm font-semibold text-gray-800 truncate">文档预览：{name}</h1>
       </div>
 
       {error ? (
         <div className="flex-1 flex items-center justify-center text-sm text-red-500">{error}</div>
       ) : loading ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">加载中...</div>
+        <div className="flex-1 flex items-center justify-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : (
-        <div className="flex-1 overflow-auto p-6 bg-white">
+        <div className="flex-1 overflow-auto p-6 bg-[var(--ui-bg-surface)]">
           <div className="max-w-4xl mx-auto">
             {/* 文档元信息卡片 */}
             {meta.length > 0 && (
@@ -123,7 +123,7 @@ export default function MarkdownReader() {
                 <div className="p-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
                   {meta.map((entry) => (
                     <div key={entry.key} className="contents">
-                      <span className="text-gray-500 font-medium text-right whitespace-nowrap">{entry.key}</span>
+                      <span className="text-[var(--ui-text-secondary)] font-medium text-right whitespace-nowrap">{entry.key}</span>
                       <span className="text-gray-800 break-words">{entry.value}</span>
                     </div>
                   ))}
@@ -143,7 +143,7 @@ export default function MarkdownReader() {
                     <table className="border-collapse border border-gray-300" {...props} />
                   ),
                   th: ({ node, ...props }) => (
-                    <th className="border border-gray-300 px-2 py-1 bg-gray-50" {...props} />
+                    <th className="border border-gray-300 px-2 py-1 bg-[var(--ui-bg-subtle)]" {...props} />
                   ),
                   td: ({ node, ...props }) => (
                     <td className="border border-gray-300 px-2 py-1" {...props} />

@@ -144,8 +144,6 @@
     "dashboard.folder:unshare": { "roles": ["admin", "engineer", "production", "guest"], "object_policy": "dashboard_folder_editor" },
     "dashboard.item:add": { "roles": ["admin", "engineer", "production", "guest"], "object_policy": "dashboard_folder_editor" },
     "dashboard.item:delete": { "roles": ["admin", "engineer", "production", "guest"], "object_policy": "dashboard_folder_editor" },
-    "dashboard:export_all": ["admin"],
-    "dashboard:import_all": ["admin"],
 
     "assistant:chat": ["admin", "engineer", "production", "guest"],
     "assistant:download_artifact": ["admin", "engineer", "production", "guest"],

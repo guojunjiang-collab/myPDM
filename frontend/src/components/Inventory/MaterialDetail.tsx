@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal } from '../Modal';
+import Button from '../ui/Button';
 import { useDataStore } from '../../stores/data';
 import type { InvMaterial } from '../../types';
 
@@ -11,9 +12,9 @@ interface Props {
 
 function InfoItem({ label, value, icon }: { label: string; value: string; icon?: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium">
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium">
         {icon && <span className="mr-1">{icon}</span>}{value}
       </div>
     </div>
@@ -48,8 +49,8 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
   }, [hasPdmRef, storeComponents.length, syncAll]);
 
   return (
-    <Modal open={true} title="物料详情" onClose={onClose} width="3xl">
-      <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
+    <Modal open={true} title="物料详情" onClose={onClose} width="3xl" height="75vh">
+      <div className="space-y-6 pr-1">
         {/* 基本信息卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <InfoItem label="编码" value={m.code} />
@@ -65,46 +66,46 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
         {/* PDM 关联零部件 */}
         {hasPdmRef && (
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">🔗 PDM 关联零部件</h4>
-            <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">🔗 PDM 关联零部件</h4>
+            <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">件号</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格型号</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">版本</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">状态</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">类型</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">件号</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">名称</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">规格型号</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">版本</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">状态</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="hover:bg-gray-50 cursor-pointer"
+                  <tr className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                     onClick={() => onViewEntity(m.ref_entity_type as 'part' | 'assembly', m.ref_entity_id!)}>
-                    <td className="px-3 py-2 text-sm text-gray-500">{m.ref_entity_type === 'part' ? '零件' : '部件'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{m.ref_entity_type === 'part' ? '零件' : '部件'}</td>
                     <td className="px-3 py-2 text-sm font-medium text-primary-600">{pdmEntity?.code || m.code}</td>
                     <td className="px-3 py-2 text-sm">{pdmEntity?.name || m.name}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{pdmEntity?.spec || m.spec || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{pdmEntity?.version || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{pdmEntity ? (PDM_STATUS[pdmEntity.status] || pdmEntity.status) : '-'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{pdmEntity?.spec || m.spec || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{pdmEntity?.version || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{pdmEntity ? (PDM_STATUS[pdmEntity.status] || pdmEntity.status) : '-'}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-gray-400 mt-1">点击上方行可查看零部件详情。</p>
+            <p className="text-xs text-[var(--ui-text-tertiary)] mt-1">点击上方行可查看零部件详情。</p>
           </div>
         )}
 
         {/* 备注 */}
         {m.remark && (
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 备注</h4>
-            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-gray-200">{m.remark}</div>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📝 备注</h4>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">{m.remark}</div>
           </div>
         )}
 
-        <div className="flex justify-end border-t border-gray-200 pt-4">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">关闭</button>
+        <div className="flex justify-end border-t border-[var(--ui-border)] pt-4">
+          <Button variant="secondary" onClick={onClose}>关闭</Button>
         </div>
       </div>
     </Modal>

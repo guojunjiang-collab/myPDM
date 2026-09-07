@@ -34,14 +34,12 @@ def is_office_file(filename: str) -> bool:
 
 
 def get_pdf_cache_path(attachment_id: str, file_path: str = None) -> Path:
-    """获取附件对应的 PDF 缓存路径（仿 get_glb_cache_path）"""
-    if file_path:
-        src = Path(file_path)
-        folder_name = src.parent.name
-        pdf_filename = src.stem + ".pdf"
-        target_dir = PDF_CACHE_DIR / folder_name
-        target_dir.mkdir(parents=True, exist_ok=True)
-        return target_dir / pdf_filename
+    """获取附件对应的 PDF 缓存路径（以附件 UUID 为唯一键）。
+
+    图文档附件统一按 {attachment_id}.pdf 命名，避免按"上传目录名+文件名 stem"
+    命名造成跨文档同名文件误命中/误删（历史曾产生 pdf_cache/1/xxx.pdf 这类
+    按迭代号命名的目录）。file_path 参数保留仅为兼容历史调用方，不再参与路径计算。
+    """
     PDF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     return PDF_CACHE_DIR / f"{attachment_id}.pdf"
 

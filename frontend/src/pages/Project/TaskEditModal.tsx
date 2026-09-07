@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
+import { toast } from '../../components/Toast';
+import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
+import Textarea from '../../components/ui/Textarea';
+import type { BadgeTone } from '../../constants/badges';
 import { projectApi } from '../../services/projectApi';
-import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
+import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi, mediaApi } from '../../services/api';
 import { useDataStore } from '../../stores/data';
 import type { CustomFieldDefinition, CustomFieldValue } from '../../types';
-import AssemblyPartPicker from '../../components/AssemblyPartPicker';
-import DocumentPicker from '../../components/DocumentPicker';
-import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
+import ItemPicker, { StatusTag } from '../../components/ItemPicker';
+import { previewAttachment } from '../../utils/attachmentPreview';
 import ECPicker from '../../components/ECPicker';
 import PartDetailModal from '../../components/PartDetailModal';
 import DocumentDetailModal from '../../components/DocumentDetailModal';
@@ -33,29 +39,62 @@ interface Props {
 const TYPES: TaskType[] = ['任务', '里程碑', '评审'];
 const STATUSES: TaskStatus[] = ['未开始', '进行中', '已完成', '挂起'];
 const PRIORITIES: TaskPriority[] = ['高', '中', '低'];
-const STATUS_CLASS: Record<string, string> = {
-  未开始: 'bg-gray-100 text-gray-600',
-  进行中: 'bg-blue-50 text-blue-700',
-  已完成: 'bg-green-50 text-green-700',
-  挂起: 'bg-amber-50 text-amber-700',
+const LINK_BADGE: Record<string, { tone: BadgeTone; label: string }> = {
+  part: { tone: 'blue', label: '零件' },
+  assembly: { tone: 'purple', label: '部件' },
+  component: { tone: 'blue', label: '零部件' },
+  config_item: { tone: 'green', label: '构型项' },
+  ec: { tone: 'amber', label: 'EC' },
+  document: { tone: 'gray', label: '图文档' },
 };
-const LINK_LABEL: Record<string, string> = {
-  part: '零部件', assembly: '零部件', component: '零部件', config_item: '构型项', ec: 'EC', document: '图文档',
+
+const logActionTone = (action: string): BadgeTone => {
+  if (action === '创建任务') return 'green';
+  if (action === '删除任务') return 'red';
+  if (action === '任务状态变更') return 'blue';
+  return 'gray';
 };
-const LINK_COLOR: Record<string, string> = {
-  part: 'bg-primary-50 text-primary-700',
-  assembly: 'bg-primary-50 text-primary-700',
-  component: 'bg-primary-50 text-primary-700',
-  config_item: 'bg-teal-50 text-teal-700',
-  ec: 'bg-amber-50 text-amber-700',
-  document: 'bg-blue-50 text-blue-700',
-};
+
+/** 描述框：随内容自动增高（输入时实时调整，值变化/初始渲染时对齐内容高度） */
+function AutoSizeTextarea({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [value]);
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onInput={(e) => {
+        const el = e.currentTarget;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+      }}
+      className="resize-none"
+      rows={3}
+      placeholder={placeholder}
+    />
+  );
+}
 
 export default function TaskEditModal({ open, projectId, task, parentId, onClose, onSaved, onRefresh }: Props) {
   const empty = { name: '', task_type: '任务' as TaskType, assignee_id: '', status: '未开始' as TaskStatus,
     priority: '中' as TaskPriority, planned_start: '', planned_end: '', actual_start: '', actual_end: '', description: '' };
   const [form, setForm] = useState(empty);
+  // 有子任务的任务：计划周期由其子任务统计（rollup）而来，编辑时不可手动修改
+  const hasChildren = (task?.children?.length ?? 0) > 0;
   const [statusSaving, setStatusSaving] = useState(false);
+  // 主保存 loading（阶段2c 补缺口）
+  const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<'info' | 'links' | 'comments' | 'logs'>('info');
   const [taskLogs, setTaskLogs] = useState<OperationLog[]>([]);
   const [taskLogsLoading, setTaskLogsLoading] = useState(false);
@@ -63,10 +102,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [links, setLinks] = useState<TaskLink[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [showPartPicker, setShowPartPicker] = useState(false);
-  const [showDocPicker, setShowDocPicker] = useState(false);
+  const [showItemPicker, setShowItemPicker] = useState(false);
   const [showECPicker, setShowECPicker] = useState(false);
-  const [showConfigPicker, setShowConfigPicker] = useState(false);
   const [detailEntityId, setDetailEntityId] = useState<string | null>(null);
   const [detailEntityType, setDetailEntityType] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
@@ -146,17 +183,31 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   };
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
     const payload: any = { ...form, parent_id: task ? undefined : parentId };
+    // 补负责人显示名（项目详情任务表按 assignee_name 显示；清空负责人时置 null 及时刷新）
+    const u = users.find((x) => x.id === payload.assignee_id);
+    payload.assignee_name = u ? u.real_name : null;
     // 未填日期发送 null 而非空字符串,避免后端日期校验失败
     if (payload.planned_start === '') payload.planned_start = null;
     if (payload.planned_end === '') payload.planned_end = null;
     if (payload.actual_start === '') payload.actual_start = null;
     if (payload.actual_end === '') payload.actual_end = null;
     try {
-      if (task) { await projectApi.updateTask(projectId, task.id, payload); onSaved({ taskId: task.id, ...payload }); }
+      if (task) {
+        // 有子任务：计划周期由子任务汇总，不提交手动修改（后端按子任务统计）
+        if (hasChildren) {
+          delete payload.planned_start;
+          delete payload.planned_end;
+        }
+        await projectApi.updateTask(projectId, task.id, payload); onSaved({ taskId: task.id, ...payload });
+      }
       else { await projectApi.createTask(projectId, payload); onSaved(); }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || '保存失败');
+      toast.error(err?.response?.data?.detail || '保存失败');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -179,14 +230,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
       // 刷新父级（甘特/计划表）但不关闭弹窗，便于连续操作
       onRefresh?.({ ...payload, taskId: task.id });
     } catch (err: any) {
-      alert(err?.response?.data?.detail || '操作失败');
+      toast.error(err?.response?.data?.detail || '操作失败');
     } finally {
       setStatusSaving(false);
     }
   };
 
   const ensureTaskId = (): string | null => {
-    if (!task) { alert('请先保存任务,再添加关联对象/评论'); return null; }
+    if (!task) { toast.error('请先保存任务,再添加关联对象/评论'); return null; }
     return task.id;
   };
 
@@ -201,6 +252,42 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     loadLinks(tid);
   };
 
+  /** 与用户看板一致的预览：部件 → 装配体 3D；零件 → STP 附件 3D；图文档 → 附件预览 */
+  const handleLinkPreview = async (l: TaskLink) => {
+    if (l.entity_type === 'assembly') {
+      window.open(`/stp-viewer?assembly=${l.entity_id}`, '_blank');
+      return;
+    }
+    if (l.entity_type === 'part') {
+      try {
+        const res: any = await partsApi.listAttachments(l.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (res?.items || []));
+        const stp = atts.find((a) => /\.(stp|step)$/i.test(a.file_name || ''));
+        if (stp) {
+          const mt = await mediaApi.token(stp.id, 'gltf');
+          window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
+          return;
+        }
+      } catch { /* 提示 */ }
+      toast.info('该零件生产附件无 STP 文件');
+      return;
+    }
+    if (l.entity_type === 'document') {
+      try {
+        const res: any = await documentsApi.listAttachments(l.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (res?.items || []));
+        const att = atts[0];
+        if (att) {
+          await previewAttachment(att.id, att.file_name || '', {
+            onArchive: () => toast.info('压缩包附件请在图文档详情中查看'),
+          });
+          return;
+        }
+      } catch { /* 提示 */ }
+      toast.info('该图文档暂无附件可预览');
+    }
+  };
+
   const submitComment = async () => {
     const tid = ensureTaskId(); if (!tid || !newComment.trim()) return;
     await projectApi.addComment(projectId, tid, newComment.trim());
@@ -213,6 +300,23 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     loadComments(tid);
   };
 
+  /** 关联对象排序：类型/件号/名称/版本/状态 */
+  const [linkSort, setLinkSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const toggleLinkSort = (key: string) => {
+    setLinkSort((s) => (s?.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  };
+  const sortedLinks = useMemo(() => {
+    if (!linkSort) return links;
+    const dir = linkSort.dir === 'asc' ? 1 : -1;
+    return [...links].sort((a, b) => {
+      const get = (l: TaskLink) => linkSort.key === 'entity_type' ? (LINK_BADGE[l.entity_type]?.label ?? l.entity_type) : ((l as any)[linkSort.key] ?? '');
+      return String(get(a)).localeCompare(String(get(b)), 'zh') * dir;
+    });
+  }, [links, linkSort]);
+  const LinkSortArrow = ({ k }: { k: string }) => (
+    <span className="ml-0.5 text-[10px]">{linkSort?.key === k ? (linkSort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+  );
+
   const handleViewEntity = async (entityType: string, entityId: string) => {
     if (entityType === 'ec') {
       // 关联只存 entity_type='ec',先试 ECR,失败再试 ECO,以打开对应详情弹窗
@@ -224,7 +328,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           await ecoApi.detail(entityId);
           setEcView({ id: entityId, kind: 'eco' });
         } catch {
-          alert('无法打开该变更单(ECR/ECO 不存在或无权限)');
+          toast.error('无法打开该变更单(ECR/ECO 不存在或无权限)');
         }
       }
       return;
@@ -278,122 +382,131 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   }, [tab, task]);
 
   return (
-    <Modal open={open} title={task ? '编辑任务' : '新建任务'} onClose={onClose} width="full">
-      <div className="h-[50vh] flex flex-col">
+    <Modal open={open} title={task ? '编辑任务' : '新建任务'} onClose={onClose} width="full" height="75vh">
+      <div className="h-full flex flex-col min-h-0">
         {/* === 核心信息区 === */}
         <div className="shrink-0 mb-3">
           <div className="grid grid-cols-6 gap-3">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <div className="text-xs text-gray-500 mb-0.5">编号</div>
-              <div className="text-sm text-gray-900 font-medium font-mono py-1">{task?.code || '—'}</div>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">编号</div>
+              <div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono py-1">{task?.code || '—'}</div>
             </div>
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                     className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 <span className="text-red-500">*</span></label>
+              <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">类型</label>
-              <select value={form.task_type} onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</label>
+              <Select size="xs" value={form.task_type} onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}>
                 {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              </Select>
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-              <span className={`inline-block px-2 py-1 text-xs rounded-full ${STATUS_CLASS[form.status]}`}>{form.status}</span>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
+              <Badge status={form.status} domain="task" />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
-              <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
+              <Select size="xs" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}>
                 {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
         </div>
 
         {/* === TAB 区（编辑模式：显示 TAB，新建模式：直接显示表单） === */}
         {task ? (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-            <div className="flex border-b border-gray-200 shrink-0">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="flex border-b border-[var(--ui-border)] shrink-0">
               {([['info', '基本信息'], ['links', '关联对象'], ['comments', '评论'], ['logs', '操作记录']] as [typeof tab, string][]).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setTab(key)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    tab === key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    tab === key ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
                   }`}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <div className="p-4 overflow-y-auto flex-1">
+            <div className="p-4 overflow-y-auto flex-1 min-h-0">
               {tab === 'info' && (
                 <div className="space-y-4">
                   {/* 负责人 */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">负责人</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">负责人</h4>
                     <div className="w-64">
-                      <select value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}
-                              className="w-full text-sm px-2 py-1.5 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                      <Select size="xs" value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
                         <option value="">未指派</option>
                         {users.map((u) => <option key={u.id} value={u.id}>{u.real_name}</option>)}
-                      </select>
+                      </Select>
                     </div>
                   </div>
 
                   {/* 计划周期（四列卡片栅格） */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">计划周期</h4>
                     <div className="grid grid-cols-4 gap-3">
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">计划开始</div>
-                        <input type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
+                          计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                        </div>
+                        <Input size="xs" type="date" value={form.planned_start}
+                               onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
+                               disabled={hasChildren}
+                               title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                               className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                       </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">计划完成</div>
-                        <input type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
+                          计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                        </div>
+                        <Input size="xs" type="date" value={form.planned_end}
+                               onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
+                               disabled={hasChildren}
+                               title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                               className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                       </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
-                        <div className="text-sm text-gray-400 py-1">{form.actual_start || '—'}</div>
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际开始</div>
+                        <div className="text-sm text-[var(--ui-text-tertiary)] py-1">{form.actual_start || '—'}</div>
                       </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">实际完成</div>
-                        <div className="text-sm text-gray-400 py-1">{form.actual_end || '—'}</div>
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际完成</div>
+                        <div className="text-sm text-[var(--ui-text-tertiary)] py-1">{form.actual_end || '—'}</div>
                       </div>
                     </div>
                   </div>
 
                   {/* 描述 */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">描述</h4>
-                    <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                              className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                              rows={3} placeholder="可选" />
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">描述</h4>
+                    <AutoSizeTextarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="可选" />
                   </div>
 
                   {/* 任务依赖 */}
                   {task?.id && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h4 className="text-sm font-semibold text-gray-700">任务依赖</h4>
-                        {canEditDeps && (
-                          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                            <select className="border rounded px-2 py-1 text-sm" value={depForm.role}
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">任务依赖</h4>
+                        {deps.length > 0 && <span className="text-xs text-[var(--ui-text-tertiary)]">共 {deps.length} 条</span>}
+                      </div>
+
+                      {/* 添加依赖：独立卡片行，控件宽度统一、换行不散乱 */}
+                      {canEditDeps && (
+                        <div className="bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg p-3 mb-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Select size="xs" className="!w-36 shrink-0" value={depForm.role}
                               onChange={(e) => setDepForm({ ...depForm, role: e.target.value as 'pred' | 'succ' })}>
                               <option value="pred">本任务为前置 →</option>
                               <option value="succ">本任务为后置 ←</option>
-                            </select>
-                            <div className="relative" ref={taskDropRef}>
-                              <input
+                            </Select>
+                            <div className="relative flex-1 min-w-[180px]" ref={taskDropRef}>
+                              <Input
+                                size="xs"
                                 type="text"
-                                className="border rounded px-2 py-1 text-sm w-48"
-                                placeholder="搜索任务…"
+                                placeholder="搜索目标任务…"
                                 value={depForm.other
                                   ? (allTasks.find(t => t.id === depForm.other)
                                       ? `${allTasks.find(t => t.id === depForm.other)!.code} ${allTasks.find(t => t.id === depForm.other)!.name}`
@@ -407,7 +520,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 onFocus={() => setTaskDropOpen(true)}
                               />
                               {taskDropOpen && (
-                                <div className="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto">
+                                <div className="absolute z-50 mt-1 w-full bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded shadow-lg max-h-48 overflow-y-auto">
                                   {allTasks
                                     .filter(t => {
                                       const q = depTaskSearch.toLowerCase();
@@ -423,25 +536,26 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                           setTaskDropOpen(false);
                                         }}
                                       >
-                                        <span className="font-mono text-xs text-gray-500 mr-1">{t.code}</span>{t.name}
+                                        <span className="font-mono text-xs text-[var(--ui-text-secondary)] mr-1">{t.code}</span>{t.name}
                                       </div>
                                     ))}
                                   {allTasks.filter(t => {
                                     const q = depTaskSearch.toLowerCase();
                                     return !q || t.code.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);
                                   }).length === 0 && (
-                                    <div className="px-3 py-2 text-sm text-gray-400">无匹配任务</div>
+                                    <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">无匹配任务</div>
                                   )}
                                 </div>
                               )}
                             </div>
-                            <select className="border rounded px-2 py-1 text-sm" value={depForm.type}
+                            <Select size="xs" className="!w-24 shrink-0" value={depForm.type}
+                              title="FS=完成→开始 · SS=开始→开始 · FF=完成→完成 · SF=开始→完成"
                               onChange={(e) => setDepForm({ ...depForm, type: e.target.value as DepType })}>
                               {(['FS', 'SS', 'FF', 'SF'] as DepType[]).map((t) => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                            <input type="number" className="border rounded px-2 py-1 text-sm w-20" placeholder="lag" value={depForm.lag}
+                            </Select>
+                            <Input size="xs" type="number" className="!w-20 shrink-0" placeholder="lag 天" value={depForm.lag}
                               onChange={(e) => setDepForm({ ...depForm, lag: Number(e.target.value) })} />
-                            <button className="px-2 py-1 text-sm bg-primary-600 text-white rounded"
+                            <Button size="sm" className="shrink-0"
                               disabled={!depForm.other}
                               onClick={async () => {
                                 const pred = depForm.role === 'pred' ? task.id : depForm.other;
@@ -452,30 +566,40 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                   setDepTaskSearch('');
                                   loadDeps();
                                 } catch (err: any) {
-                                  alert(err?.response?.data?.detail || '添加依赖失败');
+                                  toast.error(err?.response?.data?.detail || '添加依赖失败');
                                 }
-                              }}>添加依赖</button>
+                              }}>添加依赖</Button>
                           </div>
-                        )}
-                      </div>
-                      <ul className="space-y-1 mb-2">
+                          <div className="mt-2 text-xs text-[var(--ui-text-tertiary)]">
+                            依赖类型：FS=完成→开始 · SS=开始→开始 · FF=完成→完成 · SF=开始→完成；箭头方向均为「前置 → 后置」
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 依赖列表：边框容器 + 行分隔，任务名自适应省略 */}
+                      <ul className="border border-[var(--ui-border)] rounded-lg divide-y divide-[var(--ui-border)]">
                         {deps.map((d) => {
                           const isPred = d.predecessor_id === task.id;
                           const otherId = isPred ? d.successor_id : d.predecessor_id;
                           const other = allTasks.find((t) => t.id === otherId);
                           return (
-                            <li key={d.id} className="flex items-center gap-2 text-sm">
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${d.is_violation ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{d.dep_type}</span>
-                              <span className="text-gray-500">{isPred ? '后置→' : '←前置'}</span>
-                              <span className="truncate">{other ? `${other.code} ${other.name}` : otherId}</span>
-                              {d.lag_days ? <span className="text-gray-400">lag {d.lag_days}d</span> : null}
+                            <li key={d.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                              <Badge size="xs" tone={d.is_violation ? 'red' : 'gray'} label={d.dep_type} className="shrink-0" />
+                              <span className={`shrink-0 text-xs ${d.is_violation ? 'text-red-500' : 'text-[var(--ui-text-secondary)]'}`}>
+                                {isPred ? '→ 后置' : '← 前置'}
+                              </span>
+                              <span className="flex-1 min-w-0 truncate">
+                                <span className="font-mono text-xs text-[var(--ui-text-secondary)] mr-1">{other?.code}</span>
+                                <span className="text-[var(--ui-text-primary)]">{other?.name || otherId}</span>
+                              </span>
+                              {d.lag_days ? <span className="shrink-0 text-xs text-[var(--ui-text-tertiary)]">lag {d.lag_days}d</span> : null}
                               {canEditDeps && (
-                                <button className="ml-auto text-xs text-red-500" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</button>
+                                <Button variant="danger" size="xs" className="shrink-0" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</Button>
                               )}
                             </li>
                           );
                         })}
-                        {deps.length === 0 && <li className="text-xs text-gray-400">暂无依赖</li>}
+                        {deps.length === 0 && <li className="px-3 py-3 text-xs text-[var(--ui-text-tertiary)]">暂无依赖</li>}
                       </ul>
                     </div>
                   )}
@@ -483,31 +607,33 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
               )}
 
               {tab === 'links' && (
-                <div className="space-y-4">
-                  <div>
+                <div className="h-full flex flex-col gap-4 min-h-0">
+                  <div className="shrink-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <h4 className="text-sm font-semibold text-gray-700">关联对象</h4>
+                      <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联对象</h4>
                       <div className="ml-auto flex items-center gap-2">
-                        <button onClick={() => setShowPartPicker(true)} className="text-xs px-2 py-1 rounded bg-primary-50 text-primary-700 hover:bg-primary-100">零部件 +</button>
-                        <button onClick={() => setShowConfigPicker(true)} className="text-xs px-2 py-1 rounded bg-teal-50 text-teal-700 hover:bg-teal-100">构型项 +</button>
-                        <button onClick={() => setShowECPicker(true)} className="text-xs px-2 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">EC +</button>
-                        <button onClick={() => setShowDocPicker(true)} className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">图文档 +</button>
+                        <Button size="sm" onClick={() => setShowItemPicker(true)}>关联对象</Button>
+                        <Button size="sm" onClick={() => setShowECPicker(true)}>关联变更</Button>
                       </div>
                     </div>
-                    {links.length > 0 ? (
-                      <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                  </div>
+                  {links.length > 0 ? (
+                    <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0">
+                      <div className="overflow-y-auto h-full">
                         <table className="w-full text-sm">
-                          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                             <tr>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20 whitespace-nowrap">类型</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36 whitespace-nowrap">件号</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
-                              <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-12">操作</th>
+                              <th onClick={() => toggleLinkSort('entity_type')} className="text-center px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">类型<LinkSortArrow k="entity_type" /></th>
+                              <th onClick={() => toggleLinkSort('entity_code')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-36 whitespace-nowrap cursor-pointer select-none">件号<LinkSortArrow k="entity_code" /></th>
+                              <th onClick={() => toggleLinkSort('entity_name')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">名称<LinkSortArrow k="entity_name" /></th>
+                              <th onClick={() => toggleLinkSort('entity_version')} className="text-center px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap cursor-pointer select-none">版本<LinkSortArrow k="entity_version" /></th>
+                              <th onClick={() => toggleLinkSort('entity_status')} className="text-center px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">状态<LinkSortArrow k="entity_status" /></th>
+                              <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-40">操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {links.map((l) => (
-                              <tr key={l.id} className="hover:bg-gray-50 cursor-pointer"
+                            {sortedLinks.map((l) => (
+                              <tr key={l.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                                   onClick={() => {
                                     if (l.entity_type === 'part' || l.entity_type === 'assembly') {
                                       setDetailEntityId(l.entity_id);
@@ -517,29 +643,55 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                       handleViewEntity(l.entity_type, l.entity_id);
                                     }
                                   }}>
-                                <td className="px-3 py-2 whitespace-nowrap">
-                                  <span className={`text-xs px-1.5 py-0.5 rounded ${LINK_COLOR[l.entity_type] ?? 'bg-gray-100 text-gray-600'}`}>{LINK_LABEL[l.entity_type]}</span>
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  <Badge size="xs" tone={LINK_BADGE[l.entity_type]?.tone ?? 'gray'} label={LINK_BADGE[l.entity_type]?.label ?? l.entity_type} />
                                 </td>
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
-                                <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                  <button onClick={() => removeLink(l.id)} className="text-gray-400 hover:text-red-600 text-sm">×</button>
+                                <td className="px-3 py-2 text-gray-700 text-center whitespace-nowrap">{l.entity_version || '-'}</td>
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  {l.entity_type === 'ec' || !l.entity_status
+                                    ? <span className="text-[var(--ui-text-tertiary)]">-</span>
+                                    : <StatusTag status={l.entity_status} />}
+                                </td>
+                                <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                  {(l.entity_type === 'part' || l.entity_type === 'assembly') && (
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      className="mr-1"
+                                      disabled={l.entity_type === 'assembly' ? false : !l.has_stp}
+                                      title={l.entity_type === 'assembly' ? '装配体 3D 预览' : (l.has_stp ? '3D 预览' : '生产附件无 STP 文件')}
+                                      onClick={() => handleLinkPreview(l)}
+                                    >3D</Button>
+                                  )}
+                                  {l.entity_type === 'document' && (
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      className="mr-1"
+                                      disabled={!((l.attachment_count ?? 0) > 0)}
+                                      title={((l.attachment_count ?? 0) > 0) ? '预览附件' : '暂无附件'}
+                                      onClick={() => handleLinkPreview(l)}
+                                    >预览</Button>
+                                  )}
+                                  <Button variant="danger" size="xs" onClick={() => removeLink(l.id)}>移除</Button>
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
+                      </div>
                     ) : (
-                      <div className="text-xs text-gray-400 py-4">暂无关联</div>
+                      <div className="text-xs text-[var(--ui-text-tertiary)] py-4">暂无关联</div>
                     )}
-                  </div>
                 </div>
               )}
 
               {tab === 'comments' && (
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-gray-700">评论</h4>
+                  <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">评论</h4>
                   <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
                     {comments.map((c) => (
                       <div key={c.id} className="flex gap-2 text-sm">
@@ -549,22 +701,22 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{c.user_name}</span>
-                            <span className="text-xs text-gray-400">{formatDateTime(c.created_at)}</span>
+                            <span className="text-xs text-[var(--ui-text-tertiary)]">{formatDateTime(c.created_at)}</span>
                             <div className="flex-1" />
-                            <button onClick={() => removeComment(c.id)} className="text-xs text-gray-400 hover:text-red-600">删除</button>
+                            <Button variant="danger" size="xs" onClick={() => removeComment(c.id)}>删除</Button>
                           </div>
                           <div className="text-gray-700 whitespace-pre-wrap">{c.content}</div>
                         </div>
                       </div>
                     ))}
-                    {comments.length === 0 && <div className="text-xs text-gray-400 py-4">暂无评论</div>}
+                    {comments.length === 0 && <div className="text-xs text-[var(--ui-text-tertiary)] py-4">暂无评论</div>}
                   </div>
                   <div className="flex gap-2">
-                    <input value={newComment} onChange={(e) => setNewComment(e.target.value)}
+                    <Input value={newComment} onChange={(e) => setNewComment(e.target.value)}
                            onKeyDown={(e) => { if (e.key === 'Enter') submitComment(); }}
                            placeholder="写评论…(项目成员均可评论)"
-                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                    <button onClick={submitComment} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">发送</button>
+                           className="flex-1" />
+                    <Button onClick={submitComment}>发送</Button>
                   </div>
                 </div>
               )}
@@ -572,33 +724,28 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
               {tab === 'logs' && (
                 <div>
                   {taskLogsLoading ? (
-                    <div className="text-center text-gray-400 py-8">加载中...</div>
+                    <div className="text-center text-[var(--ui-text-tertiary)] py-8">加载中...</div>
                   ) : taskLogs.length === 0 ? (
-                    <div className="text-center text-gray-400 py-8">暂无操作记录</div>
+                    <div className="text-center text-[var(--ui-text-tertiary)] py-8">暂无操作记录</div>
                   ) : (
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0 z-10">
                         <tr>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">时间</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">用户</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">操作</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">详情</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">时间</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">用户</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">操作</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">详情</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {taskLogs.map((l) => (
                           <tr key={l.id}>
-                            <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(l.created_at)}</td>
+                            <td className="px-3 py-2 text-[var(--ui-text-secondary)] whitespace-nowrap">{formatDateTime(l.created_at)}</td>
                             <td className="px-3 py-2">{l.username}</td>
                             <td className="px-3 py-2">
-                              <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                l.action === '创建任务' ? 'bg-green-100 text-green-800' :
-                                l.action === '删除任务' ? 'bg-red-100 text-red-800' :
-                                l.action === '任务状态变更' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>{l.action}</span>
+                              <Badge tone={logActionTone(l.action)} label={l.action} />
                             </td>
-                            <td className="px-3 py-2 text-gray-500">{l.detail || '-'}</td>
+                            <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{l.detail || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -612,47 +759,52 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
             {/* 负责人 */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">负责人</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">负责人</h4>
               <div className="w-64">
-                <select value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}
-                        className="w-full text-sm px-2 py-1.5 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <Select size="xs" value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
                   <option value="">未指派</option>
                   {users.map((u) => <option key={u.id} value={u.id}>{u.real_name}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
 
             {/* 计划周期（四列卡片栅格） */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">计划周期</h4>
               <div className="grid grid-cols-4 gap-3">
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">计划开始</div>
-                  <input type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
+                    计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                  </div>
+                  <Input size="xs" type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
+                         disabled={hasChildren}
+                         title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                         className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">计划完成</div>
-                  <input type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
+                    计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                  </div>
+                  <Input size="xs" type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
+                         disabled={hasChildren}
+                         title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                         className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
-                  <div className="text-sm text-gray-400 py-1">—</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际开始</div>
+                  <div className="text-sm text-[var(--ui-text-tertiary)] py-1">—</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">实际完成</div>
-                  <div className="text-sm text-gray-400 py-1">—</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际完成</div>
+                  <div className="text-sm text-[var(--ui-text-tertiary)] py-1">—</div>
                 </div>
               </div>
             </div>
 
             {/* 描述 */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">描述</h4>
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                        rows={3} placeholder="可选" />
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">描述</h4>
+              <AutoSizeTextarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="可选" />
             </div>
           </div>
         )}
@@ -661,39 +813,34 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <div className="flex justify-between gap-2 border-t pt-3 mt-3 shrink-0">
           <div className="flex gap-2">
             {task && form.status === '未开始' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <Button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}>
                 {statusSaving ? '...' : '▶ 开始任务'}
-              </button>
+              </Button>
             )}
             {task && form.status === '进行中' && (
               <>
-                <button onClick={() => handleStatusAction('挂起')} disabled={statusSaving}
-                        className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm">
+                <Button variant="dark" onClick={() => handleStatusAction('挂起')} disabled={statusSaving}>
                   {statusSaving ? '...' : '⏸ 暂停任务'}
-                </button>
-                <button onClick={() => handleStatusAction('已完成')} disabled={statusSaving}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
+                </Button>
+                <Button variant="success" onClick={() => handleStatusAction('已完成')} disabled={statusSaving}>
                   {statusSaving ? '...' : '✓ 完成任务'}
-                </button>
+                </Button>
               </>
             )}
             {task && form.status === '挂起' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <Button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}>
                 {statusSaving ? '...' : '▶ 恢复任务'}
-              </button>
+              </Button>
             )}
             {task && form.status === '已完成' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 text-sm">
+              <Button variant="dark" onClick={() => handleStatusAction('进行中')} disabled={statusSaving}>
                 {statusSaving ? '...' : '↩ 退回'}
-              </button>
+              </Button>
             )}
           </div>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button onClick={handleSave} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+            <Button variant="secondary" onClick={onClose} disabled={saving}>取消</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? '保存中...' : '保存'}</Button>
           </div>
         </div>
       </div>
@@ -740,33 +887,19 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         />
       )}
 
-      {showPartPicker && (
-        <AssemblyPartPicker
-          open={showPartPicker}
-          onClose={() => setShowPartPicker(false)}
+      {showItemPicker && (
+        <ItemPicker
+          open={showItemPicker}
+          onClose={() => setShowItemPicker(false)}
+          existingIds={new Set(links.map((l) => l.entity_id))}
           onConfirm={(items) => {
-            addLinks(items.map((it) => ({ entity_type: 'part', entity_id: it.child_id })));
-            setShowPartPicker(false);
-          }}
-        />
-      )}
-      {showDocPicker && (
-        <DocumentPicker
-          open={showDocPicker}
-          onClose={() => setShowDocPicker(false)}
-          onConfirm={(items) => {
-            addLinks(items.map((it) => ({ entity_type: 'document', entity_id: it.document_id })));
-            setShowDocPicker(false);
-          }}
-        />
-      )}
-      {showConfigPicker && (
-        <ConfigItemPicker
-          open={showConfigPicker}
-          onClose={() => setShowConfigPicker(false)}
-          onConfirm={(items) => {
-            if (items.length > 0) addLinks([{ entity_type: 'config_item', entity_id: items[0].child_revision_id }]);
-            setShowConfigPicker(false);
+            addLinks(items.map((it) => ({
+              entity_type: it.entity_type === 'component'
+                ? (it.sub === 'assembly' ? 'assembly' : 'part')
+                : it.entity_type === 'configuration' ? 'config_item' : it.entity_type,
+              entity_id: it.entity_id,
+            })));
+            setShowItemPicker(false);
           }}
         />
       )}

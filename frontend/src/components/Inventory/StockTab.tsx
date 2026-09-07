@@ -3,7 +3,12 @@ import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import StockDetail from './StockDetail';
 import DocumentDetail from './DocumentDetail';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import Button from '../ui/Button';
+import SortableTh from '../ui/SortableTh';
 import type { StockRow } from '../../types';
+import { useTableSort } from '../../hooks/useTableSort';
 
 export default function StockTab() {
   const { warehouses, loadWarehouses } = useInventoryStore();
@@ -36,49 +41,49 @@ export default function StockTab() {
     });
   }, [allRows, material, warehouseId, lowOnly]);
 
+  // 客户端排序
+  const { sortedData: sortedRows, sortField, sortDirection, handleSort } = useTableSort<StockRow>(rows);
+
   const whName = (id: string) => warehouses.find((w) => w.id === id)?.name || id;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <input type="text" placeholder="搜索物料编码/名称..." value={material}
+        <Input type="text" placeholder="搜索物料编码/名称..." value={material}
           onChange={(e) => setMaterial(e.target.value)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+          className="!w-64" />
+        <Select className="!w-auto" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
           <option value="">全部仓库</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
-          <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)}
-            className="w-3.5 h-3.5" />
+        </Select>
+        <Button active={lowOnly} onClick={() => setLowOnly((v) => !v)} title="只显示库存低于阈值的物料">
           仅看低库存
-        </label>
+        </Button>
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">仓库</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">批次</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">数量</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">安全库存</th>
+              <SortableTh sortKey="material_code" active={sortField === 'material_code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-left">编码</SortableTh>
+              <SortableTh sortKey="material_name" active={sortField === 'material_name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-left">名称</SortableTh>
+              <SortableTh className="text-left">仓库</SortableTh>
+              <SortableTh sortKey="batch_no" active={sortField === 'batch_no'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-left">批次</SortableTh>
+              <SortableTh sortKey="quantity" active={sortField === 'quantity'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-right">数量</SortableTh>
+              <SortableTh sortKey="safety_stock" active={sortField === 'safety_stock'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-right">安全库存</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : allRows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
-            ) : rows.map((r, i) => (
-              <tr key={i} className={`hover:bg-gray-50 cursor-pointer ${r.is_low ? 'bg-red-50' : ''}`}
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
+            ) : sortedRows.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
+            ) : sortedRows.map((r, i) => (
+              <tr key={i} className={`cursor-pointer ${r.is_low ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-[var(--ui-bg-hover)]'}`}
                 onClick={() => setDetailMatId(r.material_id)}>
                 <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : 'text-primary-600'}`}>{r.material_code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{r.material_name}</td>

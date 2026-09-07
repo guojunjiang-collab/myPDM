@@ -7,6 +7,10 @@ import { syncRowsByPartNumber } from './syncRows';
 import { flattenTree } from './flattenTree';
 import { maxLevelOf, buildCollapsedForLevel } from './expandLevel';
 import PartDetailModal from '../PartDetailModal';
+import Button from '../ui/Button';
+import Badge from '../ui/Badge';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 
 /** BOM 结构树的展开箭头，与零部件详情子项清单保持同一风格 */
 function BomChevron({ expanded }: { expanded: boolean }) {
@@ -144,7 +148,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const hoverClass = (row: BOMRow) => {
     if (row.match_status === 'new') return 'bg-yellow-100';
     if (row.checkout_status === 'checked_out') return 'bg-blue-100';
-    return 'bg-gray-100';
+    return 'bg-[var(--ui-bg-hover)]';
   };
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -808,18 +812,19 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   return (
     <div className="flex flex-col h-full">
       {/* 汇总栏 */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 flex-wrap shrink-0">
-        <span className="bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已匹配 {totalMatched}</span>
-        <span className="bg-yellow-100 text-yellow-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">可新建 {totalNew}</span>
-        <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">冲突 {totalConflict}</span>
-        <span className="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已签出 {totalCheckedOut}</span>
-        <label className="flex items-center gap-1 text-xs text-gray-600 ml-1">
+      <div className="flex items-center gap-3 px-4 py-2 bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex-wrap shrink-0">
+        <Badge tone="green" label={`已匹配 ${totalMatched}`} />
+        <Badge tone="amber" label={`可新建 ${totalNew}`} />
+        <Badge tone="red" label={`冲突 ${totalConflict}`} />
+        <Badge tone="blue" label={`已签出 ${totalCheckedOut}`} />
+        <label className="flex items-center gap-1 text-xs text-[var(--ui-text-secondary)] ml-1">
           展开层级
-          <select
+          <Select
             value={expandSel}
             disabled={maxLevel === 0}
             onChange={e => applyExpandSel(e.target.value)}
-            className="border border-gray-300 rounded px-1.5 py-1 text-xs disabled:bg-gray-100 disabled:text-gray-400"
+            size="xs"
+            className="!w-24"
           >
             <option value="collapsed">全部折叠</option>
             {Array.from({ length: Math.max(0, maxLevel - 1) }, (_, i) => i + 1).map(k => (
@@ -827,28 +832,28 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             ))}
             <option value="all">全部展开</option>
             {expandSel === 'custom' && <option value="custom">自定义</option>}
-          </select>
+          </Select>
         </label>
         <div className="flex-1" />
-        <button
+        <Button
+          size="sm"
           onClick={handleRefreshAndMatch}
           disabled={matching}
           title="重新读取 CATIA 装配结构并重新匹配 PDM"
-          className="px-3 py-1.5 bg-sky-500 text-white rounded text-xs hover:bg-sky-600 disabled:bg-gray-300"
         >
           {matching ? '匹配中...' : '重新匹配'}
-        </button>
-        <button onClick={handleBatchPushToPDM} className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">批量属性→PDM</button>
-        <button onClick={handleBatchCheckin} className="px-3 py-1.5 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">全部签入</button>
+        </Button>
+        <Button size="sm" variant="dark" onClick={handleBatchPushToPDM}>批量属性→PDM</Button>
+        <Button size="sm" variant="success" onClick={handleBatchCheckin}>全部签入</Button>
       </div>
 
       {/* 表格：左侧固定列 + 右侧自定义字段独立水平滚动 */}
       <div className="flex-1 min-h-0 flex">
-        <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden" onScroll={handleLeftScroll}>
+        <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden scrollbar-hidden" onScroll={handleLeftScroll}>
           {/* ====== 左表：固定列 ====== */}
           <table className="border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+                <tr className="bg-[var(--ui-bg-subtle)] shadow-[0_2px_0_0_#e5e7eb]">
                   <th className="p-2 text-left" style={{ width: 180, paddingLeft: 28 }}>件号</th>
                   <th className="p-2 text-center" style={{ width: 40 }}>用量</th>
                   {BUILTIN_COLUMNS.map(col => (
@@ -871,22 +876,22 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                   <tr key={row.path}
                     onMouseEnter={() => setHoveredIndex(ri)}
                     onMouseLeave={() => setHoveredIndex(null)}
-                    className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                    className={`border-b border-[var(--ui-border)] transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                     <td
                       className="relative p-2 font-medium whitespace-nowrap"
-                      style={{ width: 180, paddingLeft: 8 + row.level * 12 }}
+                      style={{ width: 180, paddingLeft: `calc(8px + ${row.level} * var(--ui-tree-indent))` }}
                     >
                       {row.level > 0 && Array.from({ length: row.level }, (_, k) => (
                         <span
                           key={k}
                           className="absolute -top-px bottom-0 w-px bg-gray-300 pointer-events-none z-10"
-                          style={{ left: 16 + k * 12 }}
+                          style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
                         />
                       ))}
                       <span className="inline-flex items-center gap-1">
                         {expandable ? (
                           <button type="button" onClick={() => toggleCollapse(row.path)}
-                            className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                            className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-gray-200/60"
                             title={collapsed ? '展开' : '折叠'}>
                             <BomChevron expanded={!collapsed} />
                           </button>
@@ -908,31 +913,32 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       const fromPdm = cadVal === '' && pdmVal !== '';
                       const conflict = cadVal !== '' && pdmVal !== '' && cadVal.trim() !== pdmVal.trim();
                       const value = fromPdm ? pdmVal : cadVal;
-                      const toneCls = fromPdm ? ' text-green-600 border-green-400'
-                        : conflict ? ' text-red-600 border-red-400' : '';
+                      const toneCls = fromPdm ? ' !text-green-600 !border-green-400'
+                        : conflict ? ' !text-red-600 !border-red-400' : '';
                       const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmVal}`
                         : conflict ? `与 PDM 不同 — CAD: ${cadVal} / PDM: ${pdmVal}` : undefined;
                       return (
                       <td key={col.target} className="p-2" style={{ width: col.target === 'version' ? 56 : 100 }} title={title}>
-                        <input value={value} disabled={!canEditProps(row)}
+                        <Input value={value} disabled={!canEditProps(row)}
                           onChange={e => commitEdit(row, attr, e.target.value, 'builtin')}
-                          className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
+                          size="xs"
+                          className={`${toneCls}`} />
                       </td>
                       );
                     })}
                     <td className="p-2 text-center" style={{ width: 90 }}>
-                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined; return (<div className={`${n ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>{n !== undefined ? n : '—'}</div>); })()}
-                      {isCheckedOutByMe(row) && <button onClick={() => handleUploadCAD(row)} disabled={uploadingCad === row.path} title={row.doc_path || 'CATIA 源文件路径未知'} className="mt-1 px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">{uploadingCad === row.path ? '上传中...' : '上传源文件'}</button>}
-                      {!row.pdm_match && <span className="text-gray-400">—</span>}
-                      {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded cursor-not-allowed">需签出</button>}
-                      {isCheckedOutByOther(row) && <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded cursor-not-allowed">他人签出</button>}
+                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined; return (<div className={`${n ? 'font-semibold text-blue-600' : 'text-[var(--ui-text-secondary)]'}`}>{n !== undefined ? n : '—'}</div>); })()}
+                      {isCheckedOutByMe(row) && <Button size="xs" onClick={() => handleUploadCAD(row)} disabled={uploadingCad === row.path} title={row.doc_path || 'CATIA 源文件路径未知'} className="mt-1">{uploadingCad === row.path ? '上传中...' : '上传源文件'}</Button>}
+                      {!row.pdm_match && <span className="text-[var(--ui-text-tertiary)]">—</span>}
+                      {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">需签出</Button>}
+                      {isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">他人签出</Button>}
                     </td>
                     <td className="p-2 text-center" style={{ width: 100 }}>
-                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined; return (<div className={`${n ? 'font-semibold text-amber-600' : 'text-gray-500'}`}>{n !== undefined ? n : '—'}</div>); })()}
-                      {isCheckedOutByMe(row) && (<div className="flex gap-1 justify-center mt-1"><button onClick={() => handleUploadPDF(row)} disabled={uploadingPdf === row.path} title="工程图转PDF上传" className="px-2 py-0.5 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300">{uploadingPdf === row.path ? '转换中...' : 'PDF'}</button><button onClick={() => handleUploadSTP(row)} disabled={uploadingStp === row.path} title="导出STP上传" className="px-2 py-0.5 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-300">{uploadingStp === row.path ? '导出中...' : 'STP'}</button></div>)}
-                      {!row.pdm_match && <span className="text-gray-400">—</span>}
-                      {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded cursor-not-allowed">需签出</button>}
-                      {isCheckedOutByOther(row) && <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded cursor-not-allowed">他人签出</button>}
+                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined; return (<div className={`${n ? 'font-semibold text-amber-600' : 'text-[var(--ui-text-secondary)]'}`}>{n !== undefined ? n : '—'}</div>); })()}
+                      {isCheckedOutByMe(row) && (<div className="flex gap-1 justify-center mt-1"><Button size="xs" variant="danger" onClick={() => handleUploadPDF(row)} disabled={uploadingPdf === row.path} title="工程图转PDF上传">{uploadingPdf === row.path ? '转换中...' : 'PDF'}</Button><Button size="xs" variant="dark" onClick={() => handleUploadSTP(row)} disabled={uploadingStp === row.path} title="导出STP上传">{uploadingStp === row.path ? '导出中...' : 'STP'}</Button></div>)}
+                      {!row.pdm_match && <span className="text-[var(--ui-text-tertiary)]">—</span>}
+                      {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">需签出</Button>}
+                      {isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">他人签出</Button>}
                     </td>
                     <td className="p-2" style={{ width: 130 }}>
                       {row.match_status === 'conflict' && row.pdm_match ? <span className="text-red-600">{row.pdm_match.latest_version ? `版本冲突 (PDM最新: v${row.pdm_match.latest_version})` : '版本冲突'}</span>
@@ -941,39 +947,38 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       : <span className="text-amber-600">— 无 —</span>}
                     </td>
                     <td className="p-2" style={{ width: 76 }}>
-                      {row.match_status === 'matched' && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已匹配</span>}
-                      {row.match_status === 'new' && <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">可新建</span>}
-                      {row.match_status === 'conflict' && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full">冲突</span>}
-                      {row.match_status === 'unknown' && <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">未知</span>}
+                      {row.match_status === 'matched' && <Badge status="matched" domain="match" />}
+                      {row.match_status === 'new' && <Badge status="new" domain="match" />}
+                      {row.match_status === 'conflict' && <Badge status="conflict" domain="match" />}
+                      {row.match_status === 'unknown' && <Badge status="unknown" domain="match" />}
                     </td>
                     <td className="p-2" style={{ width: 76 }}>
-                      {row.checkout_status === 'not_checked_out' && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">未签出</span>}
-                      {row.checkout_status === 'checked_out' && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">已签出</span>}
-                      {row.checkout_status === 'other_checked_out' && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">他人签出</span>}
-                      {row.checkout_status === null && <span className="text-gray-400">—</span>}
+                      {row.checkout_status === 'not_checked_out' && <Badge status="not_checked_out" domain="checkout" />}
+                      {row.checkout_status === 'checked_out' && <Badge status="checked_out" domain="checkout" />}
+                      {row.checkout_status === 'other_checked_out' && <Badge status="other_checked_out" domain="checkout" />}
+                      {row.checkout_status === null && <span className="text-[var(--ui-text-tertiary)]">—</span>}
                     </td>
                     <td className="p-2 text-center" style={{ width: 160 }}>
                       <div className="flex gap-1 flex-wrap justify-center">
-                        {row.match_status === 'new' && <button onClick={() => handleCreatePart(row)} className="px-2 py-1 bg-amber-500 text-white rounded hover:bg-amber-600">创建零件</button>}
-                        {row.match_status === 'matched' && row.checkout_status === 'not_checked_out' && (<><button onClick={() => handleCheckout(row)} className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">签出</button><button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性↓</button></>)}
+                        {row.match_status === 'new' && <Button size="xs" variant="dark" onClick={() => handleCreatePart(row)}>创建零件</Button>}
+                        {row.match_status === 'matched' && row.checkout_status === 'not_checked_out' && (<><Button size="xs" onClick={() => handleCheckout(row)}>签出</Button><Button size="xs" variant="ghost" onClick={() => handlePullFromPDM(row)}>属性↓</Button></>)}
                         {row.match_status === 'matched' && row.checkout_status === 'checked_out' && (
                           <div className="flex flex-col gap-1">
                             <div className="flex gap-1 justify-center">
-                              <button onClick={() => handleCheckin(row)} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600">签入</button>
-                              <button onClick={() => handleUndoCheckout(row)} className="px-2 py-1 bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100">撤销</button>
+                              <Button size="xs" variant="success" onClick={() => handleCheckin(row)}>签入</Button>
+                              <Button size="xs" variant="ghost" onClick={() => handleUndoCheckout(row)}>撤销</Button>
                             </div>
                             <div className="flex gap-1 justify-center">
-                              <button
+                              <Button size="xs" variant="ghost"
                                 onClick={() => handlePushToPDM(row)}
                                 disabled={pushingKeys.current.has(row.path)}
                                 title="CAD 属性推送到 PDM"
-                                className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                              >属性↑</button>
-                              <button onClick={() => handlePullFromPDM(row)} title="PDM 字段拉取覆盖 CAD 属性" className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性↓</button>
+                              >属性↑</Button>
+                              <Button size="xs" variant="ghost" onClick={() => handlePullFromPDM(row)} title="PDM 字段拉取覆盖 CAD 属性">属性↓</Button>
                             </div>
                           </div>
                         )}
-                        {row.match_status === 'matched' && row.checkout_status === 'other_checked_out' && <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性↓</button>}
+                        {row.match_status === 'matched' && row.checkout_status === 'other_checked_out' && <Button size="xs" variant="ghost" onClick={() => handlePullFromPDM(row)}>属性↓</Button>}
                       </div>
                     </td>
                   </tr>
@@ -984,10 +989,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
         </div>
 
         {/* ====== 右区：自定义字段（单表结构，表头 sticky，保证列宽对齐） ====== */}
-        <div ref={rightScrollRef} className="flex-1 min-w-0 border-l-2 border-gray-200 overflow-auto" onScroll={handleRightScroll}>
+        <div ref={rightScrollRef} className="flex-1 min-w-0 border-l-2 border-[var(--ui-border)] overflow-auto" onScroll={handleRightScroll}>
           <table className="border-collapse text-xs whitespace-nowrap w-full">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+              <tr className="bg-[var(--ui-bg-subtle)] shadow-[0_2px_0_0_#e5e7eb]">
                 {propertyColumns.map(col => (
                   <th key={col} className="p-2 text-left" style={{ width: 250 }}>{col}</th>
                 ))}
@@ -1000,7 +1005,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 <tr key={row.path}
                   onMouseEnter={() => setHoveredIndex(ri)}
                   onMouseLeave={() => setHoveredIndex(null)}
-                  className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                  className={`border-b border-[var(--ui-border)] transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                   {propertyColumns.map(col => {
                     const catiaProp = getCatiaPropForPdmField(col);
                     const fieldDef = fieldDefs.find((d: any) => d.name === col);
@@ -1014,26 +1019,28 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       : cadValue.trim() === pdmValue.trim();
                     const conflict = cadValue !== '' && pdmValue !== '' && !sameVal;
                     const value = fromPdm ? pdmValue : cadValue;
-                    const toneCls = fromPdm ? ' text-green-600 border-green-400'
-                      : conflict ? ' text-red-600 border-red-400' : '';
+                    const toneCls = fromPdm ? ' !text-green-600 !border-green-400'
+                      : conflict ? ' !text-red-600 !border-red-400' : '';
                     const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmValue}`
                       : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
                     const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                     return (
                       <td key={col} className="p-2" style={{ width: 250, maxWidth: 250 }} title={title}>
                         {isSelect ? (
-                          <select value={value} disabled={!canEditProps(row) || !catiaProp}
+                          <Select value={value} disabled={!canEditProps(row) || !catiaProp}
                             onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
                             title={value || undefined}
-                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`}>
+                            size="xs"
+                            className={`truncate${toneCls}`}>
                             <option value="">—</option>
                             {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                          </select>
+                          </Select>
                         ) : (
-                          <input value={value} disabled={!canEditProps(row) || !catiaProp}
+                          <Input value={value} disabled={!canEditProps(row) || !catiaProp}
                             onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
                             title={value || undefined}
-                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`} />
+                            size="xs"
+                            className={`truncate${toneCls}`} />
                         )}
                       </td>
                     );

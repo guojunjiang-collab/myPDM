@@ -101,7 +101,7 @@ def get_ecrs(
     db: Session, params: ECRListParams, current_user=None,
     include_deleted: bool = False, updated_since: float | None = None,
 ):
-    """查询 ECR 列表（分页 + 筛选）。非管理员只看与自己相关的 ECR"""
+    """查询 ECR 列表（分页 + 筛选 + 排序）。非管理员只看与自己相关的 ECR"""
     from sqlalchemy import or_, cast, String
     q = db.query(ECR)
 
@@ -141,7 +141,29 @@ def get_ecrs(
         )
 
     total = q.count()
-    ecrs = q.order_by(ECR.created_at.desc()).offset(
+    # 服务端排序（白名单映射，防注入）
+    SORT_FIELDS = {
+        'ecr_number': ECR.ecr_number,
+        'title': ECR.title,
+        'status': ECR.status,
+        'priority': ECR.priority,
+        'creator_name': None,  # 占位，实际 join users 表
+        'created_at': ECR.created_at,
+    }
+    sort_field = params.sort_field or 'created_at'
+    sort_order = params.sort_order or 'desc'
+    if sort_field not in SORT_FIELDS:
+        raise ValueError(f"Invalid sort_field: {sort_field}")
+    if sort_order not in ('asc', 'desc'):
+        raise ValueError(f"Invalid sort_order: {sort_order}")
+    # creator_name 需关联 users 表
+    if sort_field == 'creator_name':
+        q = q.outerjoin(User, User.id == ECR.creator_id)
+        col = User.real_name
+    else:
+        col = SORT_FIELDS[sort_field]
+    order = col.asc().nullslast() if sort_order == 'asc' else col.desc().nullslast()
+    ecrs = q.order_by(order).offset(
         (params.page - 1) * params.page_size
     ).limit(params.page_size).all()
 

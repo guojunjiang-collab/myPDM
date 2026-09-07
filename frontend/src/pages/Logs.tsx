@@ -1,9 +1,23 @@
 import { useEffect, useState } from 'react';
 import { logsApi } from '../services/api';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import SortableTh from '../components/ui/SortableTh';
+import type { BadgeTone } from '../constants/badges';
 import type { OperationLog } from '../types';
 import { formatDateTime } from '../utils/date';
+import { useServerSort } from '../hooks/useServerSort';
 
 const PAGE_SIZE = 20;
+
+const actionTone = (action: string): BadgeTone => {
+  if (action.includes('创建') || action.includes('create')) return 'green';
+  if (action.includes('删除') || action.includes('delete')) return 'red';
+  if (action.includes('登录') || action.includes('login')) return 'blue';
+  return 'gray';
+};
 
 const ACTION_OPTIONS = [
   { value: '', label: '全部操作' },
@@ -37,9 +51,15 @@ export default function Logs() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
 
+  const sort = useServerSort('created_at', 'desc');
+
   useEffect(() => {
     loadLogs();
-  }, [page, filterUser, filterTargetType, filterAction, filterDateFrom, filterDateTo]);
+  }, [page, filterUser, filterTargetType, filterAction, filterDateFrom, filterDateTo, sort.sortField, sort.sortOrder]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [sort.sortField, sort.sortOrder]);
 
   const loadLogs = async () => {
     setLoading(true);
@@ -47,6 +67,8 @@ export default function Logs() {
       const params: Record<string, string | number> = {
         skip: page * PAGE_SIZE,
         limit: PAGE_SIZE,
+        sort_field: sort.sortField ?? 'created_at',
+        sort_order: sort.sortOrder,
       };
       if (filterUser) params.user_id = filterUser;
       if (filterTargetType) params.target_type = filterTargetType;
@@ -85,131 +107,117 @@ export default function Logs() {
     <div>
 
       {/* Filters */}
-      <form onSubmit={handleSearch} className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+      <form onSubmit={handleSearch} className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-4 mb-4">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">用户ID</label>
-            <input
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">用户ID</label>
+            <Input
               type="text"
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               placeholder="用户ID"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">对象类型</label>
-            <select
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">对象类型</label>
+            <Select
               value={filterTargetType}
               onChange={(e) => setFilterTargetType(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             >
               {TARGET_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">操作类型</label>
-            <select
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">操作类型</label>
+            <Select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             >
               {ACTION_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">开始日期</label>
-            <input
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">开始日期</label>
+            <Input
               type="date"
               value={filterDateFrom}
               onChange={(e) => setFilterDateFrom(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">结束日期</label>
-            <input
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">结束日期</label>
+            <Input
               type="date"
               value={filterDateTo}
               onChange={(e) => setFilterDateTo(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="md"
             onClick={handleReset}
-            className="px-4 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             重置
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            size="md"
           >
             搜索
-          </button>
+          </Button>
         </div>
       </form>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">时间</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">用户</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">操作</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">对象类型</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">对象ID</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">详情</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">IP</th>
+              <SortableTh sortKey="created_at" active={sort.isActive('created_at')} direction={sort.direction} onSort={sort.handleSort}>时间</SortableTh>
+              <SortableTh sortKey="user_name" active={sort.isActive('user_name')} direction={sort.direction} onSort={sort.handleSort}>用户</SortableTh>
+              <SortableTh sortKey="action" active={sort.isActive('action')} direction={sort.direction} onSort={sort.handleSort}>操作</SortableTh>
+              <SortableTh sortKey="target_type" active={sort.isActive('target_type')} direction={sort.direction} onSort={sort.handleSort}>对象类型</SortableTh>
+              <SortableTh>对象ID</SortableTh>
+              <SortableTh>详情</SortableTh>
+              <SortableTh sortKey="ip" active={sort.isActive('ip')} direction={sort.direction} onSort={sort.handleSort}>IP</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td>
               </tr>
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">
                   暂无数据
                 </td>
               </tr>
             ) : (
               logs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+                <tr key={log.id} className="hover:bg-[var(--ui-bg-hover)]">
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">
                     {formatDateTime(log.created_at)}
                   </td>
                   <td className="px-4 py-3 text-sm">{log.username}</td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${
-                      log.action.includes('创建') || log.action.includes('create')
-                        ? 'bg-green-100 text-green-800'
-                        : log.action.includes('删除') || log.action.includes('delete')
-                        ? 'bg-red-100 text-red-800'
-                        : log.action.includes('登录') || log.action.includes('login')
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {log.action}
-                    </span>
+                    <Badge tone={actionTone(log.action)} label={log.action} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">
                     {TARGET_TYPE_OPTIONS.find(t => t.value === log.target_type)?.label || log.target_type}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 font-mono text-xs">{log.target_id}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title={log.detail || ''}>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] font-mono text-xs">{log.target_id}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] max-w-xs truncate" title={log.detail || ''}>
                     {log.detail || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{log.ip || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">{log.ip || '-'}</td>
                 </tr>
               ))
             )}
@@ -218,39 +226,23 @@ export default function Logs() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
+          <div className="px-4 py-3 border-t border-[var(--ui-border)] flex items-center justify-between">
+            <div className="text-sm text-[var(--ui-text-secondary)]">
               共 {total} 条记录，第 {page + 1} / {totalPages} 页
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setPage(0)}
-                disabled={page === 0}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <Button variant="secondary" size="sm" onClick={() => setPage(0)} disabled={page === 0}>
                 首页
-              </button>
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 0}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(page - 1)} disabled={page === 0}>
                 上一页
-              </button>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages - 1}>
                 下一页
-              </button>
-              <button
-                onClick={() => setPage(totalPages - 1)}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1}>
                 末页
-              </button>
+              </Button>
             </div>
           </div>
         )}

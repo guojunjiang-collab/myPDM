@@ -15,7 +15,7 @@ export function Loading({ tip = '加载中...', size = 'default' }: LoadingProps
       <div
         className={`${sizeMap[size]} border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin`}
       />
-      {tip && <p className="mt-2 text-sm text-gray-500">{tip}</p>}
+      {tip && <p className="mt-2 text-sm text-[var(--ui-text-secondary)]">{tip}</p>}
     </div>
   );
 }

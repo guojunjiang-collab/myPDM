@@ -159,7 +159,7 @@ def create_eco(db: Session, data: ECOCreate, creator_id: uuid.UUID) -> ECO:
 
 def get_ecos(db: Session, params: ECOListParams, current_user=None,
               include_deleted: bool = False, updated_since: float | None = None):
-    """查询 ECO 列表（分页 + 筛选）。非管理员只看与自己相关的 ECO"""
+    """查询 ECO 列表（分页 + 筛选 + 排序）。非管理员只看与自己相关的 ECO"""
     from sqlalchemy import or_, cast, String
     q = db.query(ECO)
     if not include_deleted:
@@ -193,7 +193,29 @@ def get_ecos(db: Session, params: ECOListParams, current_user=None,
         )
 
     total = q.count()
-    ecos = q.order_by(ECO.created_at.desc()).offset(
+    # 服务端排序（白名单映射，防注入）
+    SORT_FIELDS = {
+        'eco_number': ECO.eco_number,
+        'title': ECO.title,
+        'status': ECO.status,
+        'priority': ECO.priority,
+        'creator_name': None,  # 占位，实际 join users 表
+        'created_at': ECO.created_at,
+    }
+    sort_field = params.sort_field or 'created_at'
+    sort_order = params.sort_order or 'desc'
+    if sort_field not in SORT_FIELDS:
+        raise ValueError(f"Invalid sort_field: {sort_field}")
+    if sort_order not in ('asc', 'desc'):
+        raise ValueError(f"Invalid sort_order: {sort_order}")
+    # creator_name 需关联 users 表
+    if sort_field == 'creator_name':
+        q = q.outerjoin(User, User.id == ECO.creator_id)
+        col = User.real_name
+    else:
+        col = SORT_FIELDS[sort_field]
+    order = col.asc().nullslast() if sort_order == 'asc' else col.desc().nullslast()
+    ecos = q.order_by(order).offset(
         (params.page - 1) * params.page_size
     ).limit(params.page_size).all()
 

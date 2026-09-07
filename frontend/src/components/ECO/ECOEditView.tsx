@@ -2,6 +2,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { ecrApi, ecoApi, partsApi } from '../../services/api';
 import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
+import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import TreeToggle from '../ui/TreeToggle';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import { toast } from '../Toast';
 
@@ -37,8 +42,8 @@ const ROW_BG: Record<string, string> = {
   add_existing: 'bg-green-50', add_new: 'bg-green-50',
 };
 
-const th = 'px-2 py-2 text-left text-xs font-semibold text-gray-500 border-b border-gray-200 whitespace-nowrap';
-const td = 'px-2 py-1.5 text-xs text-gray-700 border-b border-gray-100';
+const th = 'px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] border-b border-[var(--ui-border)] whitespace-nowrap';
+const td = 'px-2 py-1.5 text-xs text-gray-700 border-b border-[var(--ui-border)]';
 
 // ─── 向上溯源树：保持父→子→孙层级相邻，兄弟按件号排序，支持按层展开 ───
 interface UpwardTreeNode { node: MutableNode; children: UpwardTreeNode[]; }
@@ -91,11 +96,10 @@ function LevelCell({ n, meta, onToggle }: { n: MutableNode; meta?: Map<MutableNo
   const m = meta?.get(n);
   return (
     <td className={td}>
-      <span className="text-gray-400 inline-flex items-center gap-0.5">
+      <span className="text-[var(--ui-text-tertiary)] inline-flex items-center gap-0.5">
         {m?.hasChildren ? (
-          <button type="button" onClick={(e) => { e.stopPropagation(); onToggle?.(m.key); }}
-            className="text-gray-500 hover:text-gray-700 w-3 leading-none">{m.expanded ? '▼' : '▶'}</button>
-        ) : <span className="inline-block w-3" />}
+          <TreeToggle expanded={m.expanded} onClick={() => onToggle?.(m.key)} size="sm" />
+        ) : <TreeToggle leaf size="sm" />}
         {n.level != null ? '-'.repeat(n.level) + n.level : '-'}
       </span>
     </td>
@@ -108,10 +112,9 @@ const DOWNWARD_ACTIONS = ['no_change', 'upgrade', 'qty_change', 'delete', 'add_e
 function ActionSelect({ value, onChange, variant = 'downward' }: { value: string; onChange: (v: string) => void; variant?: 'upward' | 'downward' }) {
   const actions = variant === 'upward' ? UPWARD_ACTIONS : DOWNWARD_ACTIONS;
   return (
-    <select value={value} onChange={e => onChange(e.target.value)}
-      className="w-full text-xs border border-gray-300 rounded px-1 py-1 bg-white focus:ring-1 focus:ring-primary-500">
+    <Select size="xs" value={value} onChange={e => onChange(e.target.value)}>
       {actions.map(a => <option key={a} value={a}>{a==='no_change'?'不变':a==='upgrade'?'升版':a==='qty_change'?'数量':a==='delete'?'删除':a==='add_existing'?'新增':a}</option>)}
-    </select>
+    </Select>
   );
 }
 
@@ -141,10 +144,10 @@ function isAutoUpgraded(n: MutableNode): boolean {
 
 // ── 渲染变更状态 Badge ──
 function StatusBadge({ status }: { status: string | undefined }) {
-  if (status === 'released') return <span className="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">已发布</span>;
-  if (status === 'frozen') return <span className="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700">已冻结</span>;
-  if (status === 'draft') return <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>;
-  return <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未执行</span>;
+  // draft（已升版）为 ECO 执行语境下的业务文案，单独处理；released/frozen 走 part 域
+  if (status === 'draft') return <Badge tone="blue" label="已升版" />;
+  if (!status) return <Badge tone="gray" label="未执行" />;
+  return <Badge status={status} />;
 }
 
 function resultRow(n: MutableNode, isUpward = false) {
@@ -176,15 +179,15 @@ function cloneNodes(ecrData: any): { up: MutableNode[]; down: MutableNode[] } {
 // ── Editable upward table ──
 function EditableUpward({ rows, onUpdate, displayOnly = false, meta, onToggle }: { rows: MutableNode[]; onUpdate: (i: number, patch: Partial<MutableNode>) => void; displayOnly?: boolean; meta?: Map<MutableNode, UpRowMeta>; onToggle?: (key: string) => void }) {
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+    <div className="overflow-x-auto border border-[var(--ui-border)] rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50">
+        <thead><tr className="bg-[var(--ui-bg-subtle)]">
           <th className={`${th} w-12`}>层级</th><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
           <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16 text-center`}>目标用量</th><th className={th}>说明</th>
         </tr></thead>
-        <tbody>{rows.length === 0 ? <tr><td colSpan={8} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={8} className="text-xs text-[var(--ui-text-tertiary)] text-center py-6">无数据</td></tr>
         : rows.map((n, i) => (
-          <tr key={i} className={ROW_BG[n.action||''] || (i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50')}>
+          <tr key={i} className={ROW_BG[n.action||''] || (i % 2 === 0 ? 'bg-[var(--ui-bg-surface)]' : 'bg-[var(--ui-bg-subtle)]')}>
             <LevelCell n={n} meta={meta} onToggle={onToggle} />
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
@@ -195,12 +198,12 @@ function EditableUpward({ rows, onUpdate, displayOnly = false, meta, onToggle }:
             </td>
             <td className={`${td} text-center`}>
               {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
-              : n.action === 'qty_change' && !displayOnly ? <input type="number" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />
+              : n.action === 'qty_change' && !displayOnly ? <Input size="xs" type="number" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="!w-16 text-center" />
               : <span className="text-xs">{n._targetQty ?? (n.quantity_change?.to ?? n.quantity)}</span>}
             </td>
             <td className={td}>
-              {displayOnly ? <span className="text-gray-600">{(n._desc ?? n.change_description) || '-'}</span>
-              : <input type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs" />}
+              {displayOnly ? <span className="text-[var(--ui-text-secondary)]">{(n._desc ?? n.change_description) || '-'}</span>
+              : <Input size="xs" type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} />}
             </td>
           </tr>
         ))}</tbody>
@@ -212,16 +215,16 @@ function EditableUpward({ rows, onUpdate, displayOnly = false, meta, onToggle }:
 // ── Editable downward table ──
 function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { rows: MutableNode[]; onUpdate: (i: number, patch: Partial<MutableNode>) => void; displayOnly?: boolean; onRemove?: (i: number) => void }) {
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+    <div className="overflow-x-auto border border-[var(--ui-border)] rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50">
+        <thead><tr className="bg-[var(--ui-bg-subtle)]">
           <th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
           <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16 text-center`}>目标用量</th><th className={th}>说明</th>
           {onRemove && <th className={`${th} w-10`}></th>}
         </tr></thead>
-        <tbody>{rows.length === 0 ? <tr><td colSpan={onRemove ? 8 : 7} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={onRemove ? 8 : 7} className="text-xs text-[var(--ui-text-tertiary)] text-center py-6">无数据</td></tr>
         : rows.map((n, i) => (
-          <tr key={i} className={ROW_BG[n.action||''] || (i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50')}>
+          <tr key={i} className={ROW_BG[n.action||''] || (i % 2 === 0 ? 'bg-[var(--ui-bg-surface)]' : 'bg-[var(--ui-bg-subtle)]')}>
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
             <td className={`${td} text-center`}>{n.entity_version || '-'}</td>
@@ -233,14 +236,14 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
               {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
               : (n.action !== 'qty_change' && n.action !== 'add_existing' && n.action !== 'add_new') ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
               : displayOnly ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
-              : <input type="number" value={n._targetQty ?? n.quantity} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />}
+              : <Input size="xs" type="number" value={n._targetQty ?? n.quantity} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="!w-16 text-center" />}
             </td>
             <td className={td}>
-              {displayOnly ? <span className="text-gray-600">{(n._desc ?? n.change_description) || '-'}</span>
-              : <input type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs" />}
+              {displayOnly ? <span className="text-[var(--ui-text-secondary)]">{(n._desc ?? n.change_description) || '-'}</span>
+              : <Input size="xs" type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} />}
             </td>
             {onRemove && (n.action === 'add_new' || n.action === 'add_existing') && (
-              <td className={td}><button onClick={() => onRemove(i)} className="text-red-400 hover:text-red-600 text-xs" title="移除">✕</button></td>
+              <td className={td}><Button variant="danger" size="xs" onClick={() => onRemove(i)} title="移除">✕</Button></td>
             )}
             {onRemove && !(n.action === 'add_new' || n.action === 'add_existing') && <td className={td}></td>}
           </tr>
@@ -254,12 +257,12 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
 function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem, meta, onToggle }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; ecoId?: string; onUpgrade?: (id: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void; meta?: Map<MutableNode, UpRowMeta>; onToggle?: (key: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+    <div className="overflow-x-auto border border-[var(--ui-border)] rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={`${th} w-12`}>层级</th><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+        <thead><tr className="bg-[var(--ui-bg-subtle)]"><th className={`${th} w-12`}>层级</th><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
         {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28 text-center`}>操作</th></>}
         </tr></thead>
-        <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 7 : 5} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 7 : 5} className="text-xs text-[var(--ui-text-tertiary)] text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
           const r = resultRow(n, true);
           const exec = getExec(n.entity_id || '');
@@ -286,7 +289,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
               {canExec && (
                 <>
                   <td className={td}>
-                    {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
+                    {unchanged ? <Badge tone="gray" label="不变更" />
                     : <StatusBadge status={exec?.new_entity_status} />}
                   </td>
                   <td className={`${td} text-center`}>
@@ -297,26 +300,20 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
                       exec?.new_entity_status === 'draft' ? (
                         // 已升版：还原 + 冻结
                         <>
-                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          <Button variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>还原</Button>
+                          <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}>冻结</Button>
                         </>
                       ) : exec?.new_entity_status === 'frozen' ? (
                         // 已冻结：解冻
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                        <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>解冻</Button>
                       ) : !exec?.new_entity_status ? (
                         // 未执行：升版
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
-                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                        <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
-                      // 执行阶段
-                      exec?.new_entity_status === 'frozen' ? (
-                        // 已冻结：发布
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                      // 执行阶段：已升版（draft）或已冻结（frozen）均可直接发布
+                      (exec?.new_entity_status === 'frozen' || exec?.new_entity_status === 'draft') ? (
+                        <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
                   </div>
@@ -333,12 +330,12 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
 function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; ecoId?: string; onUpgrade?: (id: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+    <div className="overflow-x-auto border border-[var(--ui-border)] rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+        <thead><tr className="bg-[var(--ui-bg-subtle)]"><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
         {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28 text-center`}>操作</th></>}
         </tr></thead>
-        <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-[var(--ui-text-tertiary)] text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
           if (n.action === 'delete') return (<tr key={i} className={ROW_BG[n.action||'']}><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td>{canExec && <><td className={td}>-</td><td className={td}>-</td></>}</tr>);
           const r = resultRow(n);
@@ -360,7 +357,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
           {canExec && (
             <>
               <td className={td}>
-                {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
+                {unchanged ? <Badge tone="gray" label="不变更" />
                 : <StatusBadge status={effStatus} />}
               </td>
               <td className={`${td} text-center`}>
@@ -370,7 +367,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                       effStatus === 'draft' ? (
                         // 新增的零部件：隐藏"还原"按钮，避免误删
                         n.action === 'add_existing' ? (
-                          <button onClick={async (e) => {
+                          <Button variant="dark" size="xs" onClick={async (e) => {
                             e.stopPropagation();
                             let itemId = exec?.id || '';
                             if (!itemId && ecoId) {
@@ -378,10 +375,10 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                               itemId = created.data?.id;
                             }
                             onFreeze?.(itemId, n.entity_id);
-                          }} className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          }}>冻结</Button>
                         ) : (
                           <>
-                            <button onClick={async (e) => {
+                            <Button variant="danger" size="xs" onClick={async (e) => {
                               e.stopPropagation();
                               let itemId = exec?.id || '';
                               if (!itemId && ecoId) {
@@ -389,8 +386,8 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                                 itemId = created.data?.id;
                               }
                               onRelease?.(itemId, n.entity_id);
-                            }} className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                            <button onClick={async (e) => {
+                            }}>还原</Button>
+                            <Button variant="dark" size="xs" onClick={async (e) => {
                               e.stopPropagation();
                               let itemId = exec?.id || '';
                               if (!itemId && ecoId) {
@@ -398,20 +395,18 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                                 itemId = created.data?.id;
                               }
                               onFreeze?.(itemId, n.entity_id);
-                            }} className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                            }}>冻结</Button>
                           </>
                         )
                       ) : effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                        <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>解冻</Button>
                       ) : !effStatus ? (
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
-                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                        <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
-                      effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                      // 执行阶段：已升版（draft）或已冻结（frozen）均可直接发布
+                      (effStatus === 'frozen' || effStatus === 'draft') ? (
+                        <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
                   </div>
@@ -430,12 +425,12 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
 function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, onRelease, onFreeze, onPublish, onViewItem, onEditItem, checkedIds, onToggleCheck }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; ecoId?: string; onUpgrade?: (id: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+    <div className="overflow-x-auto border border-[var(--ui-border)] rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={th}>件号</th><th className={th}>名称</th><th className={th}>当前版本</th><th className={th}>变更后版本</th>
+        <thead><tr className="bg-[var(--ui-bg-subtle)]"><th className={th}>件号</th><th className={th}>名称</th><th className={th}>当前版本</th><th className={th}>变更后版本</th>
         {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28`}>操作</th></>}
         </tr></thead>
-        <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无</td></tr>
+        <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-[var(--ui-text-tertiary)] text-center py-6">无</td></tr>
         : rows.map((n, i) => {
           const exec = getExec(n.entity_id || '');
           const effStatus = exec?.new_entity_status;
@@ -450,7 +445,7 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, on
             }
           };
           return (
-          <tr key={i} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} ${effStatus ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
+          <tr key={i} className={`${i % 2 === 0 ? 'bg-[var(--ui-bg-surface)]' : 'bg-[var(--ui-bg-subtle)]'} ${effStatus ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
             <td className={td}>{n.entity_version || '-'}</td>
@@ -465,22 +460,18 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, on
                     {ecoStatus === 'draft' ? (
                       effStatus === 'draft' ? (
                         <>
-                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          <Button variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>还原</Button>
+                          <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}>冻结</Button>
                         </>
                       ) : effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                        <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>解冻</Button>
                       ) : !effStatus ? (
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}
-                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                        <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
-                      effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                      // 执行阶段：已升版（draft）或已冻结（frozen）均可直接发布
+                      (effStatus === 'frozen' || effStatus === 'draft') ? (
+                        <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
                   </div>
@@ -678,11 +669,11 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
 
   return (
     <div>
-      {!ecrId && <p className="text-xs text-gray-400 text-center py-4">未关联 ECR，无法显示变更分析</p>}
-      {ecrId && loading && <p className="text-xs text-gray-400 text-center py-4">加载中...</p>}
+      {!ecrId && <p className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">未关联 ECR，无法显示变更分析</p>}
+      {ecrId && loading && <p className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">加载中...</p>}
       {ecrId && !loading && ecrData && (<>
         <div className="flex items-center justify-end mb-2">
-          {!readOnly && !hideResetButton && <button onClick={resetToEcr} className="text-xs px-3 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>}
+          {!readOnly && !hideResetButton && <Button variant="secondary" size="xs" onClick={resetToEcr}>还原</Button>}
         </div>
 
         {/* Per-group analysis cards */}
@@ -693,40 +684,40 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
           const { visible: upVisible, meta: upMeta } = computeVisibleUpward(upFiltered, expandedUp, ai.entity_code || '');
           const downRows = localDown.filter(n => (n as any)._affectedCode === ai.entity_code).sort(byCode);
           return (
-            <div key={ai.entity_id || ai.entity_code} className="bg-gray-50/50 rounded-lg border border-gray-200 p-3 mb-4">
+            <div key={ai.entity_id || ai.entity_code} className="bg-[var(--ui-bg-subtle)] rounded-lg border border-[var(--ui-border)] p-3 mb-4">
               <div className="text-xs font-semibold text-gray-700 mb-2">📦 受影响物料: {ai.entity_code} - {ai.entity_name}</div>
               <AffectedTable rows={[ai]} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} />
 
               {/* Upward chain */}
               {upFiltered.length > 0 && (<>
-                <div className="text-xs font-semibold text-gray-600 mt-3 mb-1">📊 向上溯源链</div>
+                <div className="text-xs font-semibold text-[var(--ui-text-secondary)] mt-3 mb-1">📊 向上溯源链</div>
                 <div className="grid grid-cols-2 gap-4 mb-3">
                   {readOnly ? (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} onUpdate={() => {}} displayOnly /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECR 评估</div><EditableUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} onUpdate={() => {}} displayOnly /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECO 执行后</div><ReadOnlyUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>) : (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} onUpdate={(i, patch) => { const origIdx = localUp.indexOf(upVisible[i]); if (origIdx >= 0) updateUp(origIdx, patch); }} /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECR 评估（可编辑）</div><EditableUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} onUpdate={(i, patch) => { const origIdx = localUp.indexOf(upVisible[i]); if (origIdx >= 0) updateUp(origIdx, patch); }} /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECO 执行后</div><ReadOnlyUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>)}
                 </div>
               </>)}
 
               {/* Downward items */}
               {(ai.entity_type === 'assembly' || ai.entity_type === 'component') && (<>
-                <div className="text-xs font-semibold text-gray-600 mt-3 mb-1">📋 向下子项</div>
+                <div className="text-xs font-semibold text-[var(--ui-text-secondary)] mt-3 mb-1">📋 向下子项</div>
                 <div className="grid grid-cols-2 gap-4">
                   {readOnly ? (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableDownward rows={downRows} onUpdate={() => {}} displayOnly /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECR 评估</div><EditableDownward rows={downRows} onUpdate={() => {}} displayOnly /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>) : (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableDownward rows={downRows} onUpdate={(i, patch) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) updateDown(origIdx, patch); }} onRemove={(i) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECR 评估（可编辑）</div><EditableDownward rows={downRows} onUpdate={(i, patch) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) updateDown(origIdx, patch); }} onRemove={(i) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
+                    <div><div className="text-xs text-[var(--ui-text-secondary)] mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>)}
                 </div>
                 {!readOnly && (
                   <div className="mt-2 flex gap-2 items-center">
-                    <span className="text-xs text-gray-400">+ 添加子项到本部件</span>
-                    <button onClick={async () => { setPickerParentId(ai.entity_id || ai.entity_code || ''); setPickerOpen(true); }} className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">添加子项</button>
+                    <span className="text-xs text-[var(--ui-text-tertiary)]">+ 添加子项到本部件</span>
+                    <Button size="xs" onClick={async () => { setPickerParentId(ai.entity_id || ai.entity_code || ''); setPickerOpen(true); }}>添加子项</Button>
                   </div>
                 )}
               </>)}
@@ -735,7 +726,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
         })}
 
       </>)}
-      {ecrId && !loading && !ecrData && <p className="text-xs text-gray-400 text-center py-4">未找到 ECR</p>}
+      {ecrId && !loading && !ecrData && <p className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">未找到 ECR</p>}
 
       <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)}
         onConfirm={async (items) => {

@@ -42,13 +42,19 @@ def is_stp_file(filename: str) -> bool:
 
 def get_glb_cache_path(attachment_id: str, file_path: str = None, is_part: bool = False) -> Path:
     """
-    获取附件对应的 glb 文件路径
-    
+    获取附件对应的 glb 文件路径（以附件 UUID 为唯一键）。
+
+    零部件附件（is_part=True）存放到 parts/ 子目录；图文档附件直接以
+    {attachment_id}.glb 命名。统一按 UUID 键避免不同图文档/版本的同名 STP
+    落到同一缓存路径造成误命中与误删（历史曾用 file_path 父目录+stem 命名，
+    图文档上传目录末级为迭代号，产生 glb_cache/1/xxx.glb 这类目录）。
+    file_path 参数保留仅为兼容历史调用方，不再参与路径计算。
+
     Args:
         attachment_id: 附件 UUID
-        file_path: 可选的 STP 文件路径（图文档附件如 document/test/file.stp）
-        is_part: 是否为零部件附件（PartAttachment），使用 attachment_id 作为唯一键
-    
+        file_path: 历史参数（不再使用）
+        is_part: 是否为零部件附件（PartAttachment）
+
     Returns:
         glb 文件路径
     """
@@ -56,16 +62,8 @@ def get_glb_cache_path(attachment_id: str, file_path: str = None, is_part: bool 
         target_dir = GLTF_CACHE_DIR / "parts"
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir / f"{attachment_id}.glb"
-    elif file_path:
-        stp_path = Path(file_path)
-        folder_name = stp_path.parent.name
-        glb_filename = stp_path.stem + ".glb"
-        target_dir = GLTF_CACHE_DIR / folder_name
-        target_dir.mkdir(parents=True, exist_ok=True)
-        return target_dir / glb_filename
-    else:
-        GLTF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        return GLTF_CACHE_DIR / f"{attachment_id}.glb"
+    GLTF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return GLTF_CACHE_DIR / f"{attachment_id}.glb"
 
 
 def _get_failed_path(glb_path: Path) -> Path:
@@ -195,11 +193,13 @@ def get_gltf_path_for_attachment(attachment_id: str, file_path: str = None, is_p
 
 
 def delete_glb_cache(attachment_id: str, file_path: str = None, is_part: bool = False):
-    """删除附件对应的 glb 文件及失败标记"""
+    """删除附件对应的 glb 文件（base + 三档 LOD）及失败标记"""
     glb_path = get_glb_cache_path(attachment_id, file_path, is_part)
-    if glb_path.exists():
-        glb_path.unlink()
-        logger.info(f"已删除 glb 缓存: {glb_path}")
+    targets = [glb_path, *get_lod_glb_paths(attachment_id, file_path, is_part).values()]
+    for p in targets:
+        if p.exists():
+            p.unlink()
+            logger.info(f"已删除 glb 缓存: {p}")
     failed_path = _get_failed_path(glb_path)
     if failed_path.exists():
         failed_path.unlink()

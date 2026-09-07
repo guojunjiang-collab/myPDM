@@ -31,11 +31,11 @@ export default function PendingApproval() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-sm p-10 max-w-md w-full text-center border border-gray-100">
+    <div className="min-h-screen bg-[var(--ui-bg-subtle)] flex items-center justify-center">
+      <div className="bg-[var(--ui-bg-surface)] rounded-xl shadow-sm p-10 max-w-md w-full text-center border border-[var(--ui-border)]">
         <div className="text-5xl mb-4">&#x23F3;</div>
         <h1 className="text-xl font-semibold text-gray-800 mb-2">等待审批</h1>
-        <p className="text-gray-500 text-sm leading-relaxed mb-8">
+        <p className="text-[var(--ui-text-secondary)] text-sm leading-relaxed mb-8">
           您的账号正在等待管理员审批，
           <br />
           审批通过后即可正常使用系统功能。
@@ -46,7 +46,7 @@ export default function PendingApproval() {
             disabled={notified || loading}
             className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
               notified
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                ? 'bg-gray-100 text-[var(--ui-text-tertiary)] cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
@@ -54,7 +54,7 @@ export default function PendingApproval() {
           </button>
           <button
             onClick={handleLogout}
-            className="w-full py-2.5 rounded-lg font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            className="w-full py-2.5 rounded-lg font-medium text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] transition-colors"
           >
             退出登录
           </button>
