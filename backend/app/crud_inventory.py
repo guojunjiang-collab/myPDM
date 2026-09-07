@@ -403,7 +403,7 @@ def list_documents(db: Session, params: DocumentListParams, current_user: User):
         q = q.filter(InventoryDocument.doc_number.ilike(f"%{params.search}%"))
     total = q.count()
     # 服务端排序（白名单映射，防注入）
-    from ..models import User as UserModel
+    from app.models import User as UserModel
     from sqlalchemy.orm import aliased
     SORT_FIELDS = {
         'doc_number': InventoryDocument.doc_number,
