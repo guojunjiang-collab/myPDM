@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { cadBridge } from '../services/cadBridge';
+import { cadBridge, type BridgeProgressEvent } from '../services/cadBridge';
 import { useAuthStore } from '../stores/auth';
 
 export interface CADStatus {
@@ -70,9 +70,9 @@ export function useCADBridge(cadType: CADType = 'catia') {
     return result;
   }, [ensureConnected, ns]);
 
-  const readAssemblyTree = useCallback(async (): Promise<AssemblyTreeNode> => {
+  const readAssemblyTree = useCallback(async (onProgress?: (e: BridgeProgressEvent) => void): Promise<AssemblyTreeNode> => {
     await ensureConnected();
-    return cadBridge.call(`${ns}.assembly.read_tree`, {}, tokenRef.current, 300000);
+    return cadBridge.call(`${ns}.assembly.read_tree`, {}, tokenRef.current, 300000, onProgress);
   }, [ensureConnected, ns]);
 
   const readProperties = useCallback(async (path: string): Promise<AssemblyTreeNode['properties']> => {

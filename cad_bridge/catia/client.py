@@ -61,8 +61,10 @@ class CATIAClient:
             logger.error(f"检测 CATIA 文档失败: {e}")
             return {"active": True, "has_document": False, "error": str(e)}
 
-    def read_assembly_tree(self, params: dict = None) -> dict:
-        """读取当前装配体的完整产品结构树"""
+    def read_assembly_tree(self, params: dict = None, on_progress=None) -> dict:
+        """读取当前装配体的完整产品结构树。
+        on_progress(count, name) 可选：每读取一个节点（先序）回调一次，
+        count 为已读节点数、name 为节点名，用于前端显示读取进度。"""
         catia = self._get_catia_app()
         if catia is None:
             raise RuntimeError("CATIA_NOT_FOUND")
@@ -72,7 +74,7 @@ class CATIAClient:
             raise RuntimeError("NO_ACTIVE_DOC")
 
         product = doc.Product
-        tree = self._read_product_tree(product, path="0", level=0)
+        tree = self._read_product_tree(product, path="0", level=0, on_progress=on_progress, counter={"n": 0})
         # 矩阵读取统计日志，便于排查"推送无矩阵"类问题
         total, ok = [0], [0]
         def _count(node):
@@ -201,8 +203,9 @@ class CATIAClient:
         logger.info(f"未获取到源文档路径: {getattr(product, 'Name', '?')} (path={getattr(product, 'path', '?')})")
         return ""
 
-    def _read_product_tree(self, product, path: str, level: int) -> dict:
+    def _read_product_tree(self, product, path: str, level: int, on_progress=None, counter=None) -> dict:
         """递归读取产品树节点（含属性）"""
+        counter = counter if counter is not None else {"n": 0}
         is_assembly = False
         try:
             is_assembly = product.Products.Count > 0
@@ -237,6 +240,11 @@ class CATIAClient:
             "children": []
         }
 
+        # 节点读取完成，报告进度（先序）
+        counter["n"] += 1
+        if on_progress is not None:
+            on_progress(counter["n"], str(product.Name))
+
         if is_assembly:
             child_count = product.Products.Count
             for i in range(1, child_count + 1):
@@ -245,7 +253,9 @@ class CATIAClient:
                     child_node = self._read_product_tree(
                         child,
                         path=f"{path}.{i}",
-                        level=level + 1
+                        level=level + 1,
+                        on_progress=on_progress,
+                        counter=counter
                     )
                     node["children"].append(child_node)
                 except Exception as e:

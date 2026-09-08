@@ -18,10 +18,23 @@ interface BridgeResponse {
   error?: { code: string; message: string };
 }
 
-class CADBridgeClient {
+export interface BridgeProgressEvent {
+  event: 'progress';
+  request_id: number;
+  current: number;
+  name?: string;
+}
+
+interface PendingEntry {
+  resolve: (v: any) => void;
+  reject: (e: Error) => void;
+  onProgress?: (e: BridgeProgressEvent) => void;
+}
+
+export class CADBridgeClient {
   private ws: WebSocket | null = null;
   private url: string;
-  private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+  private pending = new Map<number, PendingEntry>();
   private nextId = 1;
   private onStatusChange?: (connected: boolean) => void;
 
@@ -76,14 +89,19 @@ class CADBridgeClient {
 
       ws.onmessage = (event) => {
         try {
-          const response: BridgeResponse = JSON.parse(event.data);
-          const pending = this.pending.get(response.id);
+          const data: BridgeResponse & BridgeProgressEvent = JSON.parse(event.data);
+          if (data && data.event === 'progress') {
+            const pending = this.pending.get(data.request_id);
+            pending?.onProgress?.(data);
+            return;
+          }
+          const pending = this.pending.get(data.id);
           if (pending) {
-            this.pending.delete(response.id);
-            if (response.error) {
-              pending.reject(new Error(response.error.message));
+            this.pending.delete(data.id);
+            if (data.error) {
+              pending.reject(new Error(data.error.message));
             } else {
-              pending.resolve(response.result);
+              pending.resolve(data.result);
             }
           }
         } catch (e) {
@@ -103,7 +121,7 @@ class CADBridgeClient {
     }
   }
 
-  call(method: string, params: Record<string, any> = {}, token: string, timeoutMs = 30000): Promise<any> {
+  call(method: string, params: Record<string, any> = {}, token: string, timeoutMs = 30000, onProgress?: (e: BridgeProgressEvent) => void): Promise<any> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error('桥接服务未连接'));
     }
@@ -112,7 +130,7 @@ class CADBridgeClient {
     const request: BridgeRequest = { id, method, params, token };
 
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { resolve, reject, onProgress });
       this.ws!.send(JSON.stringify(request));
 
       setTimeout(() => {

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import logging
 from websockets.asyncio.server import serve
@@ -17,6 +18,34 @@ class BridgeServer:
     def register(self, method: str, handler: callable):
         """注册方法处理器"""
         self.handlers[method] = handler
+
+    def _make_progress_sender(self, websocket, req_id):
+        """构造线程安全的进度发送器（单飞合并，防并发 send 冲突）。
+
+        进度消息尽力而为：发送失败静默丢弃，不影响最终响应。
+        供 handler 在后台线程执行长任务时，实时回投进度到前端。"""
+        loop = asyncio.get_running_loop()
+        state = {"pending": None, "sending": False}
+
+        async def _flush():
+            state["sending"] = True
+            while state["pending"] is not None:
+                payload = state["pending"]
+                state["pending"] = None
+                try:
+                    await websocket.send(json.dumps({
+                        "event": "progress", "request_id": req_id, **payload
+                    }))
+                except Exception:
+                    pass
+            state["sending"] = False
+
+        def send_progress(payload: dict) -> None:
+            state["pending"] = payload
+            if not state["sending"]:
+                loop.call_soon_threadsafe(asyncio.ensure_future, _flush())
+
+        return send_progress
 
     async def _handle_message(self, websocket, raw: str) -> str:
         """处理单条 JSON-RPC 消息，返回响应 JSON 字符串"""
@@ -40,7 +69,11 @@ class BridgeServer:
             })
 
         try:
-            result = await self.handlers[method](params, token)
+            handler = self.handlers[method]
+            if len(inspect.signature(handler).parameters) >= 3:
+                result = await handler(params, token, self._make_progress_sender(websocket, req_id))
+            else:
+                result = await handler(params, token)
             return json.dumps({"id": req_id, "result": result})
         except Exception as e:
             logger.exception(f"方法 {method} 执行失败")

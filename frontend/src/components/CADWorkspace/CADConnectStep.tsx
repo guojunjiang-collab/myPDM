@@ -18,6 +18,8 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
   const [docInfo, setDocInfo] = useState<{ name: string; type: string } | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [loadingTree, setLoadingTree] = useState(false);
+  const [progressCount, setProgressCount] = useState(0);
+  const [progressName, setProgressName] = useState('');
   const [error, setError] = useState('');
 
   const cadLabel = cadType === 'catia' ? 'CATIA' : 'SolidWorks';
@@ -44,8 +46,13 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
 
   const handleLoadAssembly = async () => {
     setLoadingTree(true);
+    setProgressCount(0);
+    setProgressName('');
     try {
-      const tree = await bridge.readAssemblyTree();
+      const tree = await bridge.readAssemblyTree((e) => {
+        setProgressCount(e.current);
+        setProgressName(e.name || '');
+      });
       if (!tree) {
         setError('读取装配结构失败');
         return;
@@ -107,6 +114,13 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
           </Button>
         )}
       </div>
+
+      {loadingTree && (
+        <div className="mt-4 px-4 py-3 rounded-lg border border-primary-200 bg-primary-50 text-sm text-primary-800 text-center">
+          正在读取装配结构… 已读取 <span className="font-semibold">{progressCount}</span> 个节点
+          {progressName ? <span className="ml-1 text-primary-700">（{progressName}）</span> : null}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg mt-4 text-sm">

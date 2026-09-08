@@ -106,8 +106,18 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient,
     async def handle_catia_detect(params: dict, token: str) -> dict:
         return catia_client.detect()
 
-    async def handle_catia_read_tree(params: dict, token: str) -> dict:
-        return catia_client.read_assembly_tree(params)
+    async def handle_catia_read_tree(params: dict, token: str, send_progress=None) -> dict:
+        loop = asyncio.get_running_loop()
+
+        def on_progress(count: int, name: str):
+            if send_progress is not None:
+                send_progress({"current": count, "name": name})
+
+        # 后台线程执行同步 COM 递归，避免大装配读取阻塞事件循环；
+        # 进度经 send_progress 回投事件循环发送（call_soon_threadsafe）。
+        return await loop.run_in_executor(
+            None, catia_client.read_assembly_tree, params, on_progress
+        )
 
     async def handle_catia_read_properties(params: dict, token: str) -> dict:
         return catia_client.read_properties(params)
