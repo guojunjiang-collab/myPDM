@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { useCADBridge, CADType } from '../../hooks/useCADBridge';
 import type { BOMRow } from './CADBOMMatchTable';
 import { flattenTree } from './flattenTree';
@@ -19,8 +19,16 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
   const [detecting, setDetecting] = useState(false);
   const [loadingTree, setLoadingTree] = useState(false);
   const [progressCount, setProgressCount] = useState(0);
-  const [progressName, setProgressName] = useState('');
+  const [progressEntries, setProgressEntries] = useState<{ count: number; name: string }[]>([]);
   const [error, setError] = useState('');
+  const progressLogRef = useRef<HTMLDivElement>(null);
+
+  // 进度日志自动滚动到底部
+  useEffect(() => {
+    if (loadingTree && progressLogRef.current) {
+      progressLogRef.current.scrollTop = progressLogRef.current.scrollHeight;
+    }
+  }, [progressEntries, loadingTree]);
 
   const cadLabel = cadType === 'catia' ? 'CATIA' : 'SolidWorks';
 
@@ -47,11 +55,16 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
   const handleLoadAssembly = async () => {
     setLoadingTree(true);
     setProgressCount(0);
-    setProgressName('');
+    setProgressEntries([]);
+    setError('');
     try {
       const tree = await bridge.readAssemblyTree((e) => {
         setProgressCount(e.current);
-        setProgressName(e.name || '');
+        // 只保留最近 200 条日志，避免大装配内存/渲染压力
+        setProgressEntries((prev) => {
+          const next = [...prev, { count: e.current, name: e.name || '' }];
+          return next.length > 200 ? next.slice(next.length - 200) : next;
+        });
       });
       if (!tree) {
         setError('读取装配结构失败');
@@ -116,9 +129,24 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
       </div>
 
       {loadingTree && (
-        <div className="mt-4 px-4 py-3 rounded-lg border border-primary-200 bg-primary-50 text-sm text-primary-800 text-center">
-          正在读取装配结构… 已读取 <span className="font-semibold">{progressCount}</span> 个节点
-          {progressName ? <span className="ml-1 text-primary-700">（{progressName}）</span> : null}
+        <div className="mt-4 w-full max-w-md rounded-lg border border-primary-200 bg-primary-50 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-primary-200 text-sm text-primary-800">
+            <span className="inline-block h-4 w-4 shrink-0 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+            <span className="whitespace-nowrap">
+              正在读取装配结构… 已读取 <span className="font-semibold tabular-nums">{progressCount}</span> 个节点
+            </span>
+          </div>
+          <div
+            ref={progressLogRef}
+            className="h-44 overflow-y-auto px-4 py-2 text-xs font-mono leading-5 text-primary-700"
+          >
+            {progressEntries.map((entry) => (
+              <div key={entry.count} className="whitespace-nowrap">
+                <span className="text-primary-400 select-none">#{entry.count}</span>{' '}
+                {entry.name || '…'}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
