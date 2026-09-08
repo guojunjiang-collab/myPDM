@@ -141,8 +141,17 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
     async def handle_sw_detect(params: dict, token: str) -> dict:
         return sw_client.detect()
 
-    async def handle_sw_read_tree(params: dict, token: str) -> dict:
-        return sw_client.read_assembly_tree(params)
+    async def handle_sw_read_tree(params: dict, token: str, send_progress=None) -> dict:
+        loop = asyncio.get_running_loop()
+
+        def on_progress(count: int, name: str):
+            if send_progress is not None:
+                send_progress({"current": count, "name": name})
+
+        # 后台线程执行同步 COM 递归，避免大装配读取阻塞事件循环
+        return await loop.run_in_executor(
+            None, sw_client.read_assembly_tree, params, on_progress
+        )
 
     async def handle_sw_read_properties(params: dict, token: str) -> dict:
         return sw_client.read_properties(params)

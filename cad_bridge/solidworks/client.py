@@ -105,8 +105,10 @@ class SolidWorksClient:
         except Exception:
             return "Unknown"
 
-    def read_assembly_tree(self, params: dict = None) -> dict:
-        """读取活动装配体的完整结构树（swDocASSEMBLY 类型才支持）"""
+    def read_assembly_tree(self, params: dict = None, on_progress=None) -> dict:
+        """读取活动装配体的完整结构树（swDocASSEMBLY 类型才支持）。
+        on_progress(count, name) 可选：每读取一个节点（先序）回调一次，
+        count 为已读节点数、name 为节点名，用于前端显示读取进度。"""
         sw = self._get_sw_app()
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
@@ -154,13 +156,16 @@ class SolidWorksClient:
         # 文档缓存：按文件路径去重，本次读取后台打开的文档统一在末尾关闭，
         # 避免逐件打开-关闭时误关子装配导致读不到下一级（旧实现的时序 bug）
         doc_cache: dict = {}
+        counter = {"n": 1}
+        if on_progress is not None:
+            on_progress(1, root_name)
         try:
             components = doc.GetComponents(True)  # True = 仅顶层组件
             if components is not None:
                 comp_list = list(components)
                 logger.info(f"SW 顶层组件数: {len(comp_list)}")
                 for i, comp in enumerate(comp_list):
-                    child = self._read_component_tree(sw, comp, f"0.{i+1}", 1, doc_cache)
+                    child = self._read_component_tree(sw, comp, f"0.{i+1}", 1, doc_cache, on_progress=on_progress, counter=counter)
                     if child is not None:
                         tree["children"].append(child)
             else:
@@ -301,8 +306,9 @@ class SolidWorksClient:
                 pass
         return []
 
-    def _read_component_tree(self, sw, comp, path: str, level: int, cache: dict) -> dict | None:
+    def _read_component_tree(self, sw, comp, path: str, level: int, cache: dict, on_progress=None, counter=None) -> dict | None:
         """递归读取组件树节点（含属性/矩阵/子组件）"""
+        counter = counter if counter is not None else {"n": 0}
         try:
             name = comp.Name2
         except Exception:
@@ -350,6 +356,11 @@ class SolidWorksClient:
             "children": []
         }
 
+        # 节点读取完成，报告进度（先序）
+        counter["n"] += 1
+        if on_progress is not None:
+            on_progress(counter["n"], name)
+
         # 从已加载/后台打开的装配文档枚举直接子级并递归（可读全部层级）
         if is_assembly:
             children = self._child_components(comp, model_doc)
@@ -358,7 +369,7 @@ class SolidWorksClient:
             else:
                 logger.warning(f"  [{name}] 装配体但未枚举到子级 (model_doc={'有' if model_doc else '无'})")
             for i, child in enumerate(children):
-                child_node = self._read_component_tree(sw, child, f"{path}.{i+1}", level + 1, cache)
+                child_node = self._read_component_tree(sw, child, f"{path}.{i+1}", level + 1, cache, on_progress=on_progress, counter=counter)
                 if child_node is not None:
                     node["children"].append(child_node)
 

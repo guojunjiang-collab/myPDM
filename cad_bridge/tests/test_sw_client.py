@@ -291,3 +291,16 @@ def test_write_property_on_level2_node():
     # 版本经别名映射写入 SW 实际属性名「版本」，而非字面 "Revision"
     assert part_y_doc.cpm.Get("版本") == "D"
     assert part_y_doc.saved is True
+
+
+def test_read_tree_reports_progress_counts():
+    """读取装配树按先序报告进度：根 → 子装配 → 孙零件 → 另一顶层零件。"""
+    client = SolidWorksClient()
+    sw, _ = _build_scene()
+    _patch(client, sw)
+
+    calls = []
+    client.read_assembly_tree({}, on_progress=lambda count, name: calls.append((count, name)))
+
+    assert [c[0] for c in calls] == [1, 2, 3, 4]
+    assert [c[1] for c in calls] == ["总装.SLDASM", "subA-1", "partY-1", "partX-1"]
